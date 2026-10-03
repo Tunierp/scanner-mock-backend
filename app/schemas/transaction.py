@@ -17,7 +17,6 @@ class PaymentData(BaseModel):
     reason_code: ReasonCode
     message: str
     amount: Money = Field(description="Montant débité (0 pour un abonnement) ou tarif demandé si refusé.")
-    currency: str
     balance_before: Money | None = Field(None, description="Présent uniquement si le solde a été débité.")
     balance_after: Money | None = Field(None, description="Présent uniquement si le solde a été débité.")
     balance: Money | None = Field(None, description="Présent uniquement pour INSUFFICIENT_BALANCE (solde inchangé).")

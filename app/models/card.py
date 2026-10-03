@@ -13,7 +13,7 @@ class Card(Base):
     __table_args__ = (CheckConstraint("balance >= 0", name="ck_cards_balance_non_negative"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    card_token: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    card_tag: Mapped[str] = mapped_column(String(10), unique=True, index=True)
     status: Mapped[str] = mapped_column(String(20), default=CardStatus.ACTIVE.value)
     balance: Mapped[Decimal] = mapped_column(Numeric(12, 3), default=Decimal("0.000"))
     currency: Mapped[str] = mapped_column(String(3), default="TND")

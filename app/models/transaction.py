@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -11,15 +11,21 @@ from app.models.card import Card
 class Transaction(Base):
     """Journal des transactions.
 
-    La contrainte UNIQUE sur `transaction_id` est la garantie ultime d'idempotence.
+    L'identité d'un scan est (device_id, transaction_id, occurred_at) : la contrainte UNIQUE correspondante est la
+    garantie ultime d'idempotence. Un `transaction_id` réutilisé un autre jour (compteur remis à zéro, par
+    exemple) n'est donc PAS pris pour un renvoi : l'heure du badge (`occurred_at`) est différente.
     `route_id` contient le code de ligne envoyé par le scanner (ex. ROUTE-001).
     `fare` = tarif demandé ; `amount` = montant réellement débité (0 pour un abonnement).
     """
 
     __tablename__ = "transactions"
+    __table_args__ = (
+        UniqueConstraint("device_id", "transaction_id", "occurred_at", name="uq_transactions_scan"),
+        Index("ix_transactions_trip_lookup", "card_id", "vehicle_id", "route_id", "occurred_at"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    transaction_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    transaction_id: Mapped[str] = mapped_column(String(64))
     card_id: Mapped[int] = mapped_column(ForeignKey("cards.id"), index=True)
     device_id: Mapped[str] = mapped_column(String(64))
     vehicle_id: Mapped[str] = mapped_column(String(64))

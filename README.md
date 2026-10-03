@@ -1,201 +1,126 @@
 # Scanner Transport — Backend de test (MOCK)
 
-Backend **de test** permettant à un développeur IoT de tester les APIs d'un scanner de transport public.
+> **« mock » = simulé / factice.** Ce backend *imite* le vrai système (paiement, cartes, abonnements) avec des données
+> fictives en base, uniquement pour que le développeur IoT puisse tester ses appels API. Aucun vrai paiement
+> (ni Stripe, ni banque, ni TPE), aucun vrai lecteur RFID/NFC. Le nom `scanner_mock` (base de données) n'a aucun
+> effet technique : il se change dans `DATABASE_URL`.
 
-- ❌ Aucun vrai paiement (ni Stripe, ni bancaire, ni TPE) — le « paiement » est **simulé** en base.
-- ❌ Aucun vrai lecteur RFID/NFC — le scanner envoie simplement un `card_token`.
-- ✅ APIs REST documentées (Swagger), testables via Swagger / Postman / curl.
-
-Stack : Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, PostgreSQL 16, Alembic, Docker, pytest, httpx.
-
-## 1. Installation
-
-Prérequis : Docker + Docker Compose. (Pour lancer sans Docker : Python 3.12+ et un PostgreSQL.)
-
-```bash
-git clone <ce-projet> && cd scanner-mock-backend
-```
-
-## 2. Lancement avec Docker
-
-```bash
-docker compose up --build
-```
-
-Au démarrage, le conteneur `api` exécute automatiquement : migrations Alembic → création des données de test → serveur.
-
-## 3. Swagger
-
-- Swagger UI : <http://localhost:8000/docs>
-- OpenAPI JSON : <http://localhost:8000/openapi.json>
-- Health check : <http://localhost:8000/health> → `{"status": "ok"}`
-
-Chaque endpoint de `/docs` propose des **exemples prêts à envoyer** (menu « Examples » du corps de requête), les réponses possibles et les erreurs.
-
-## 4. Données de test
-
-| Carte | Statut | Solde | Abonnement | Résultat attendu (fare = 0.800) |
-|---|---|---|---|---|
-| `CARD-TEST-001` | ACTIVE | 10.000 | SUB-001 → `ROUTE-001` | ROUTE-001 → `APPROVED / VALID_SUBSCRIPTION` (solde inchangé) ; ROUTE-002 → `BALANCE_DEBITED` |
-| `CARD-TEST-002` | ACTIVE | 0.300 | aucun | `DECLINED / INSUFFICIENT_BALANCE` |
-| `CARD-TEST-003` | ACTIVE | 10.000 | aucun | `APPROVED / BALANCE_DEBITED` |
-| `CARD-TEST-004` | **BLOCKED** | 10.000 | aucun | `DECLINED / CARD_BLOCKED` |
-| `CARD-TEST-005` | ACTIVE | 10.000 | SUB-002 → `ROUTE-003` | ROUTE-003 → `VALID_SUBSCRIPTION` ; ROUTE-001 → `BALANCE_DEBITED` |
-| `CARD-TEST-006` *(bonus)* | **EXPIRED** | 10.000 | aucun | `DECLINED / CARD_EXPIRED` |
-| `CARD-TEST-007` *(bonus)* | ACTIVE | 10.000 | SUB-EXPIRED (périmé) | `BALANCE_DEBITED` (abonnement non valide) |
-
-Lignes : `ROUTE-001`, `ROUTE-002`, `ROUTE-003`. Toute autre ligne → `INVALID_ROUTE`. Devise : `TND`.
-
-**Remettre les données à zéro** (soldes initiaux + purge des transactions) :
-
-```bash
-docker compose exec api python -m app.seed --reset
-```
-
-## 5. Exemples de requêtes
-
-**Abonnement valide**
-```bash
-curl -X POST http://localhost:8000/api/v1/scanner/payments -H "Content-Type: application/json" -d '{
-  "transaction_id": "TRX-000001", "card_token": "CARD-TEST-001", "device_id": "SCANNER-001",
-  "vehicle_id": "BUS-001", "route_id": "ROUTE-001", "fare": 0.800, "currency": "TND",
-  "occurred_at": "2026-09-30T18:30:00Z"}'
-```
-```json
-{"success": true, "data": {"transaction_id": "TRX-000001", "status": "APPROVED", "payment_method": "SUBSCRIPTION",
- "reason_code": "VALID_SUBSCRIPTION", "message": "Voyage couvert par l'abonnement.", "amount": 0.0, "currency": "TND"}}
-```
-
-**Débit du solde** (`CARD-TEST-003`)
-```json
-{"success": true, "data": {"transaction_id": "TRX-000002", "status": "APPROVED", "payment_method": "CARD_BALANCE",
- "reason_code": "BALANCE_DEBITED", "message": "Paiement accepté.", "amount": 0.8, "currency": "TND",
- "balance_before": 10.0, "balance_after": 9.2}}
-```
-
-**Solde insuffisant** (`CARD-TEST-002`) — HTTP 200, `DECLINED`
-```json
-{"success": true, "data": {"transaction_id": "TRX-000003", "status": "DECLINED", "payment_method": null,
- "reason_code": "INSUFFICIENT_BALANCE", "message": "Solde insuffisant.", "amount": 0.8, "currency": "TND", "balance": 0.3}}
-```
-
-**Carte inconnue** — HTTP 404
-```json
-{"success": false, "error": {"code": "CARD_NOT_FOUND", "message": "Carte introuvable."}}
-```
-
-**Synchronisation offline**
-```bash
-curl -X POST http://localhost:8000/api/v1/scanner/sync/transactions -H "Content-Type: application/json" -d '{
-  "device_id": "SCANNER-001",
-  "transactions": [
-    {"transaction_id": "OFFLINE-000001", "card_token": "CARD-TEST-001", "vehicle_id": "BUS-001",
-     "route_id": "ROUTE-001", "fare": 0.800, "currency": "TND", "occurred_at": "2026-09-30T18:30:00Z"},
-    {"transaction_id": "OFFLINE-000002", "card_token": "CARD-TEST-002", "vehicle_id": "BUS-001",
-     "route_id": "ROUTE-002", "fare": 0.800, "currency": "TND", "occurred_at": "2026-09-30T18:31:00Z"},
-    {"transaction_id": "OFFLINE-000001", "card_token": "CARD-TEST-001", "vehicle_id": "BUS-001",
-     "route_id": "ROUTE-001", "fare": 0.800, "currency": "TND", "occurred_at": "2026-09-30T18:30:00Z"}
-  ]}'
-```
-
-## 6. Logique de paiement
-
-Pour chaque transaction, dans cet ordre (`app/services/payment_service.py`) :
-
-1. `transaction_id` déjà connu → `DUPLICATE_TRANSACTION` (rien n'est retraité).
-2. Carte introuvable → `CARD_NOT_FOUND` (HTTP 404).
-3. Tarif (≤ 0, > 3 décimales, > 1000), devise ≠ devise de la carte → `INVALID_FARE` (400) ; ligne inconnue/inactive → `INVALID_ROUTE` (400).
-4. Carte `BLOCKED` → `DECLINED / CARD_BLOCKED` ; `EXPIRED` → `DECLINED / CARD_EXPIRED`.
-5. Abonnement valide pour la ligne → `APPROVED / VALID_SUBSCRIPTION`.
-6. Sinon solde suffisant → débit → `APPROVED / BALANCE_DEBITED`.
-7. Sinon → `DECLINED / INSUFFICIENT_BALANCE`.
-
-**Convention HTTP :** un refus métier (solde insuffisant, carte bloquée/expirée) est un **HTTP 200** avec `status = DECLINED`.
-Les erreurs de requête/d'identification sont des codes HTTP d'erreur (400, 404, 409, 422, 500) au format uniforme :
-`{"success": false, "error": {"code": "...", "message": "..."}}`.
-
-| Code | HTTP (`/payments`) |
-|---|---|
-| `VALID_SUBSCRIPTION`, `BALANCE_DEBITED` | 200 APPROVED |
-| `INSUFFICIENT_BALANCE`, `CARD_BLOCKED`, `CARD_EXPIRED` | 200 DECLINED |
-| `CARD_NOT_FOUND` | 404 |
-| `INVALID_ROUTE`, `INVALID_FARE` | 400 |
-| `DUPLICATE_TRANSACTION`, `TRANSACTION_ALREADY_PROCESSED` | 409 |
-| *(champ manquant / mauvais type)* `VALIDATION_ERROR` | 422 |
-| `INTERNAL_ERROR` | 500 |
-
-## 7. Logique abonnement
-
-Une carte est couverte si elle possède un `CardSubscription` **actif**, dont la période contient `occurred_at`
-(`valid_from ≤ occurred_at ≤ valid_until`), lié à un `Subscription` **actif** qui couvre la **ligne** demandée
-(table `subscription_routes`). Dans ce cas : voyage autorisé, `amount = 0`, **aucun débit**.
-Un abonnement valable pour une autre ligne ne couvre pas le voyage : on retombe sur le solde.
-
-## 8. Logique solde
-
-`balance_after = balance_before − fare`. Le solde ne peut jamais devenir négatif (contrainte `CHECK` en base + vérification).
-Un refus pour solde insuffisant ne modifie pas le solde. Les transactions refusées sont enregistrées.
-La réponse contient `balance_before` / `balance_after` (débit) ou `balance` (solde insuffisant).
-
-## 9. Synchronisation offline
-
-`POST /api/v1/scanner/sync/transactions` traite le lot **dans l'ordre**, transaction par transaction, avec **le même
-`PaymentService.process_transaction`** que `/payments` (la logique n'est pas dupliquée). Le HTTP 200 est renvoyé
-pour tout lot valide ; le détail est dans `data.results`. Une erreur sur un élément (carte inconnue, ligne invalide…)
-n'interrompt pas les suivants : l'élément est renvoyé `DECLINED` avec son `reason_code`.
-
-Compteurs : `total` = reçues ; `processed` = `approved` + `declined` (hors doublons) ; `duplicates` = doublons
-(`DUPLICATE_TRANSACTION` et `TRANSACTION_ALREADY_PROCESSED`). Un doublon contient aussi `original_status` /
-`original_reason_code` (résultat du traitement initial).
-
-## 10. Idempotence
-
-- `transactions.transaction_id` a une **contrainte UNIQUE** en base.
-- Renvoyer le même `transaction_id` ne débite **jamais** une seconde fois : `/payments` répond **409 `DUPLICATE_TRANSACTION`**
-  (avec le résultat initial dans `error.details`), `/sync/transactions` renvoie l'élément en `DUPLICATE_TRANSACTION`.
-- Même `transaction_id` mais carte / ligne / tarif différents → `TRANSACTION_ALREADY_PROCESSED`.
-- **Concurrence** : dans une seule transaction PostgreSQL, la carte est verrouillée (`SELECT … FOR UPDATE`), le doublon est
-  re-vérifié sous verrou, puis débit + insertion sont commités ensemble. Si deux requêtes avec le même `transaction_id`
-  passent quand même simultanément, la contrainte UNIQUE fait échouer la seconde (`IntegrityError`), qui est annulée
-  et convertie en doublon.
-
-## Tests
-
-```bash
-pip install -r requirements.txt
-pytest                      # SQLite en mémoire (rapide)
-```
-
-Avec PostgreSQL (verrous réels + tests de concurrence dans `tests/test_concurrency.py`) — utilisez une base dédiée,
-elle est vidée avant chaque test :
-
-```bash
-docker compose up -d db
-TEST_DATABASE_URL=postgresql+psycopg://scanner:scanner@localhost:5433/scanner_mock pytest
-```
+Stack : Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, PostgreSQL, Alembic, pytest, httpx (Docker en option).
 
 ## Lancement sans Docker
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env            # adapter DATABASE_URL
-alembic upgrade head && python -m app.seed
-uvicorn app.main:app --reload
+cp .env.example .env              # adapter DATABASE_URL
+alembic upgrade head              # crée / met à jour les tables
+python -m app.seed                # données de test
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
+
+Swagger : <http://localhost:8000/docs> — Health : <http://localhost:8000/health>
+
+Avec Docker : `docker compose up --build`.
+Remise à zéro des soldes et des transactions : `python -m app.seed --reset`.
+
+## Mise à jour depuis la version précédente
+
+```bash
+alembic upgrade head          # migrations 0002 (card_token -> card_tag) et 0003 (identité du scan)
+python -m app.seed --reset    # ajoute les nouvelles cartes et remet les soldes
+```
+
+## Cartes de test
+
+| `card_tag` | Statut | Solde | Abonnement | Résultat (tarif 0.800) |
+|---|---|---|---|---|
+| `1000000001` | ACTIVE | 10.000 | `ROUTE-001` | ROUTE-001 → `VALID_SUBSCRIPTION` ; ROUTE-002 → `BALANCE_DEBITED` |
+| `1000000002` | ACTIVE | 0.300 | aucun | `INSUFFICIENT_BALANCE` |
+| `1000000003` | ACTIVE | 10.000 | aucun | `BALANCE_DEBITED` |
+| `1000000004` | BLOCKED | 10.000 | aucun | `CARD_BLOCKED` |
+| `1000000005` | ACTIVE | 10.000 | `ROUTE-003` | ROUTE-003 → `VALID_SUBSCRIPTION` ; ROUTE-001 → `BALANCE_DEBITED` |
+| `1000000006` | EXPIRED | 10.000 | aucun | `CARD_EXPIRED` |
+| `1000000007` | ACTIVE | 10.000 | périmé | `BALANCE_DEBITED` |
+| `1258465854`, `1258465855` | ACTIVE | 10.000 | aucun | `BALANCE_DEBITED` (scénario « deux bus ») |
+
+Lignes : `ROUTE-001`, `ROUTE-002`, `ROUTE-003` (autre ligne → `INVALID_ROUTE`).
+`card_tag` : **exactement 10 chiffres, envoyé comme texte** (`"1258465854"`). Il n'y a plus de champ `currency` (montants en TND).
+
+## Requête type
+
+```json
+{
+  "transaction_id": "SCANNER-001-1788719400-0001",
+  "card_tag": "1258465854",
+  "device_id": "SCANNER-001",
+  "vehicle_id": "BUS-001",
+  "route_id": "ROUTE-001",
+  "fare": 0.800,
+  "occurred_at": "2026-09-30T18:30:00Z"
+}
+```
+
+## Logique (ordre des règles)
+
+1. Même scan déjà traité (`device_id` + `transaction_id` + `occurred_at`) → 409 `DUPLICATE_TRANSACTION` (aucun retraitement).
+2. Carte inconnue → 404 `CARD_NOT_FOUND`.
+3. Tarif (≤ 0, > 3 décimales, > 1000) → 400 `INVALID_FARE` ; ligne inconnue → 400 `INVALID_ROUTE`.
+4. Carte bloquée / expirée → 200 `DECLINED` (`CARD_BLOCKED` / `CARD_EXPIRED`).
+5. **Voyage déjà validé** → 200 `DECLINED / TRIP_ALREADY_VALIDATED` : « Votre voyage est déjà payé/validé. » (aucun débit).
+6. Abonnement valide pour la ligne → `APPROVED / VALID_SUBSCRIPTION` (aucun débit).
+7. Solde suffisant → débit → `APPROVED / BALANCE_DEBITED`.
+8. Sinon → `DECLINED / INSUFFICIENT_BALANCE` (solde inchangé).
+
+Un refus métier est un **HTTP 200** avec `status = DECLINED`. Erreurs de requête : 400, 404, 409, 422, 500 au format
+`{"success": false, "error": {"code": "...", "message": "..."}}`.
+
+## Deux protections différentes (à ne pas confondre)
+
+| | Protège contre | Mécanisme |
+|---|---|---|
+| **Identité du scan** (`device_id` + `transaction_id` + `occurred_at`) | Le **renvoi de la même requête** (réseau instable, retry, rejeu d'un lot offline) | 409 `DUPLICATE_TRANSACTION`, rien n'est retraité |
+| **Règle du voyage** | Un **nouveau scan** (nouveau `transaction_id`) de la même carte pour le même voyage | 200 `DECLINED / TRIP_ALREADY_VALIDATED` |
+
+### `transaction_id` : qui le génère, et comment un même id peut revenir sans problème
+
+- Il est **généré par le scanner** (pas par le backend) : en mode offline le scanner doit identifier le scan *avant* de parler au serveur.
+- Un scan est identifié par **`(device_id, transaction_id, occurred_at)`** (contrainte `UNIQUE` en base). Conséquences :
+  - deux scanners (bus, trains…) peuvent utiliser le même `transaction_id` sans conflit ;
+  - un `transaction_id` **réutilisé un autre jour** (compteur remis à zéro, par exemple le `5` d'aujourd'hui et le `5` de demain) est un **nouveau scan**, traité normalement ;
+  - pour **renvoyer le même scan** (retry), le scanner renvoie le **même `transaction_id` ET le même `occurred_at`** (l'heure du badge mémorisée, jamais « maintenant »).
+- Filet de sécurité : si un renvoi part avec une autre heure, il n'est plus reconnu comme doublon, mais la règle du voyage ci-dessous l'empêche d'être débité (réponse `TRIP_ALREADY_VALIDATED`).
+- Recommandé quand même : un UUID, ou `<device_id>-<epoch>-<compteur>`. L'horloge du scanner doit être fiable (NTP/GPS) : une horloge remise à une date fixe au redémarrage avec un compteur remis à zéro pourrait produire deux fois la même identité.
+
+### Règle du voyage (configurable)
+
+Un scan est refusé en `TRIP_ALREADY_VALIDATED` s'il existe déjà un scan **APPROVED** (abonnement ou solde) de la **même carte**, dans le
+**même véhicule**, sur la **même ligne**, à moins de **`TRIP_WINDOW_MINUTES` minutes** (défaut : **60**, variable d'environnement).
+- Deux voyageurs différents dans le même bus → acceptés tous les deux.
+- Même carte dans un autre véhicule ou sur une autre ligne → nouveau voyage (correspondance), accepté.
+- Un premier scan refusé (solde insuffisant…) ne bloque pas le suivant.
+- Vérifié sous verrou de la carte : deux scans simultanés ne peuvent pas être débités tous les deux.
+
+## `vehicle_id` et `route_id` : d'où viennent-ils ?
+
+Le backend ne les calcule pas, il les reçoit. Côté scanner : `vehicle_id` est une **configuration fixe** du scanner (le véhicule où il est installé) ;
+`route_id` vient du **poste du conducteur / de l'ordinateur de bord** (la ligne en service, qui change selon le service) ; `route_id` doit
+exister côté backend, sinon `INVALID_ROUTE`.
+
+## Synchronisation offline
+
+`POST /api/v1/scanner/sync/transactions` : mêmes règles que `/payments` (même `PaymentService`), traitement dans l'ordre, un lot peut mélanger
+résultats et erreurs (HTTP 200). `device_id` est indiqué une fois pour tout le lot. Compteurs : `total`, `processed` (= `approved` + `declined`,
+hors doublons), `duplicates`.
+
+## Tests
+
+```bash
+pytest                                  # SQLite en mémoire
+TEST_DATABASE_URL=postgresql+psycopg://scanner:scanner@localhost:5432/scanner_mock_test pytest   # PostgreSQL + concurrence
+```
+La base de test est vidée avant chaque test : utilisez une base dédiée.
 
 ## Structure
 
-```
-app/main.py            création de l'app, routers, middlewares, handlers d'erreurs (aucune logique métier)
-app/routers/           health, payments, sync (aucune logique métier)
-app/schemas/           modèles Pydantic requests/responses
-app/models/            entités SQLAlchemy
-app/repositories/      accès aux données
-app/services/          PaymentService (toute la logique métier)
-app/dependencies/      session DB + injection du service
-app/core/              config, exceptions, constantes (codes métier, messages)
-app/seed.py            données de test
-alembic/               migrations
-tests/                 pytest + httpx
-```
+`app/main.py` (assemblage) · `app/routers/` · `app/schemas/` · `app/models/` · `app/repositories/` · `app/services/payment_service.py` (toute la logique métier) ·
+`app/dependencies/` · `app/core/` (config, exceptions, constantes) · `app/seed.py` · `alembic/` · `tests/`

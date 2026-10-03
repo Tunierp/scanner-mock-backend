@@ -37,6 +37,7 @@ class ReasonCode(StrEnum):
     INVALID_FARE = "INVALID_FARE"
     DUPLICATE_TRANSACTION = "DUPLICATE_TRANSACTION"
     TRANSACTION_ALREADY_PROCESSED = "TRANSACTION_ALREADY_PROCESSED"
+    TRIP_ALREADY_VALIDATED = "TRIP_ALREADY_VALIDATED"
     INTERNAL_ERROR = "INTERNAL_ERROR"
     # Codes techniques (erreurs HTTP génériques)
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -55,8 +56,9 @@ MESSAGES: dict[ReasonCode, str] = {
     ReasonCode.INVALID_FARE: "Tarif invalide.",
     ReasonCode.DUPLICATE_TRANSACTION: "Transaction déjà traitée (doublon). Le résultat initial est conservé.",
     ReasonCode.TRANSACTION_ALREADY_PROCESSED: (
-        "Ce transaction_id a déjà été traité avec des données différentes."
+        "Ce scan (même scanner, même transaction_id, même heure) a déjà été traité avec des données différentes."
     ),
+    ReasonCode.TRIP_ALREADY_VALIDATED: "Votre voyage est déjà payé/validé.",
     ReasonCode.INTERNAL_ERROR: "Erreur interne du serveur.",
     ReasonCode.VALIDATION_ERROR: "Requête invalide.",
     ReasonCode.NOT_FOUND: "Ressource introuvable.",
@@ -66,3 +68,6 @@ MESSAGES: dict[ReasonCode, str] = {
 # Le tarif est exprimé avec 3 décimales maximum (dinar tunisien : millimes).
 MONEY_DECIMALS = 3
 MAX_FARE = 1000
+
+# Devise interne (non exposée par l'API) : toutes les cartes sont en dinar tunisien.
+DEFAULT_CURRENCY = "TND"

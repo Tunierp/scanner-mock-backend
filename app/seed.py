@@ -34,15 +34,18 @@ SUBSCRIPTIONS = {
     "SUB-EXPIRED": ("Abonnement ligne 1 (périmé)", ["ROUTE-001"]),
 }
 
-# (card_token, status, balance, [(subscription_name, valid_from, valid_until)])
+# (card_tag, status, balance, [(subscription_name, valid_from, valid_until)])
 CARDS = [
-    ("CARD-TEST-001", CardStatus.ACTIVE, "10.000", [("SUB-001", VALID_FROM, VALID_UNTIL)]),
-    ("CARD-TEST-002", CardStatus.ACTIVE, "0.300", []),
-    ("CARD-TEST-003", CardStatus.ACTIVE, "10.000", []),
-    ("CARD-TEST-004", CardStatus.BLOCKED, "10.000", []),
-    ("CARD-TEST-005", CardStatus.ACTIVE, "10.000", [("SUB-002", VALID_FROM, VALID_UNTIL)]),
-    ("CARD-TEST-006", CardStatus.EXPIRED, "10.000", []),
-    ("CARD-TEST-007", CardStatus.ACTIVE, "10.000", [("SUB-EXPIRED", VALID_FROM, EXPIRED_UNTIL)]),
+    ("1000000001", CardStatus.ACTIVE, "10.000", [("SUB-001", VALID_FROM, VALID_UNTIL)]),
+    ("1000000002", CardStatus.ACTIVE, "0.300", []),
+    ("1000000003", CardStatus.ACTIVE, "10.000", []),
+    ("1000000004", CardStatus.BLOCKED, "10.000", []),
+    ("1000000005", CardStatus.ACTIVE, "10.000", [("SUB-002", VALID_FROM, VALID_UNTIL)]),
+    ("1000000006", CardStatus.EXPIRED, "10.000", []),
+    ("1000000007", CardStatus.ACTIVE, "10.000", [("SUB-EXPIRED", VALID_FROM, EXPIRED_UNTIL)]),
+    # Cartes pour le scénario « deux bus » (sans abonnement)
+    ("1258465854", CardStatus.ACTIVE, "10.000", []),
+    ("1258465855", CardStatus.ACTIVE, "10.000", []),
 ]
 
 
@@ -78,10 +81,10 @@ def seed(db: Session, reset: bool = False) -> None:
         subscriptions[name] = subscription
     db.flush()
 
-    for token, status, balance, subs in CARDS:
-        card = db.scalar(select(Card).where(Card.card_token == token))
+    for tag, status, balance, subs in CARDS:
+        card = db.scalar(select(Card).where(Card.card_tag == tag))
         if card is None:
-            card = Card(card_token=token, status=status.value, balance=Decimal(balance), currency="TND")
+            card = Card(card_tag=tag, status=status.value, balance=Decimal(balance), currency="TND")
             db.add(card)
             db.flush()
         elif reset:

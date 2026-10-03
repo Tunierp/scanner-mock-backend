@@ -2,6 +2,7 @@
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.dependencies.database import get_db
 from app.repositories.card_repository import CardRepository
 from app.repositories.route_repository import RouteRepository
@@ -17,4 +18,5 @@ def get_payment_service(db: Session = Depends(get_db)) -> PaymentService:
         subscriptions=SubscriptionRepository(db),
         routes=RouteRepository(db),
         transactions=TransactionRepository(db),
+        trip_window_minutes=get_settings().trip_window_minutes,
     )

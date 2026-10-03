@@ -14,7 +14,7 @@ DESCRIPTION = """
 **Backend de TEST (MOCK)** pour le développeur IoT : aucun vrai paiement, aucun vrai lecteur RFID/NFC.
 
 Logique : abonnement valide pour la ligne → voyage gratuit ; sinon débit du solde ; sinon refus.
-Cartes de test : `CARD-TEST-001` à `CARD-TEST-007` (voir le README).
+Cartes de test : `1000000001` à `1000000007`, `1258465854`, `1258465855` (voir le README).
 """
 
 app = FastAPI(title=settings.app_name, version=settings.app_version, description=DESCRIPTION)

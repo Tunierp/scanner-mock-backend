@@ -3,22 +3,28 @@
 Utilisé à la fois par POST /api/v1/scanner/payments et POST /api/v1/scanner/sync/transactions.
 
 Ordre des règles pour une transaction :
-  1. transaction_id déjà connu         -> DUPLICATE_TRANSACTION (409, rien n'est retraité)
-  2. carte inconnue                    -> CARD_NOT_FOUND (404)
-  3. tarif / devise / ligne invalides  -> INVALID_FARE / INVALID_ROUTE (400)
-  4. carte bloquée / expirée           -> DECLINED (CARD_BLOCKED / CARD_EXPIRED)
-  5. abonnement valide pour la ligne   -> APPROVED / VALID_SUBSCRIPTION (aucun débit)
-  6. solde suffisant                   -> APPROVED / BALANCE_DEBITED
-  7. solde insuffisant                 -> DECLINED / INSUFFICIENT_BALANCE (aucun débit)
+  1. même scan déjà traité (device_id + transaction_id + occurred_at) -> DUPLICATE_TRANSACTION (409)
+  2. carte inconnue                         -> CARD_NOT_FOUND (404)
+  3. tarif / ligne invalides                -> INVALID_FARE / INVALID_ROUTE (400)
+  4. carte bloquée / expirée                -> DECLINED (CARD_BLOCKED / CARD_EXPIRED)
+  5. même carte, même véhicule, même ligne, déjà validée dans la fenêtre de voyage
+                                            -> DECLINED / TRIP_ALREADY_VALIDATED (aucun débit)
+  6. abonnement valide pour la ligne        -> APPROVED / VALID_SUBSCRIPTION (aucun débit)
+  7. solde suffisant                        -> APPROVED / BALANCE_DEBITED
+  8. solde insuffisant                      -> DECLINED / INSUFFICIENT_BALANCE (aucun débit)
 
-Atomicité / concurrence : la ligne de la carte est verrouillée (SELECT ... FOR UPDATE), puis la
-vérification du doublon est refaite sous verrou, puis débit + insertion de la transaction sont
-commités ensemble. La contrainte UNIQUE sur transactions.transaction_id est le filet de sécurité final.
+Deux protections distinctes (ne pas les confondre) :
+  * transaction_id  : protège contre le RENVOI d'une même requête (réseau instable, retry).
+  * règle du voyage : protège contre un NOUVEAU scan de la même carte pour le même voyage.
+
+Atomicité / concurrence : la ligne de la carte est verrouillée (SELECT ... FOR UPDATE), puis le doublon
+et la règle du voyage sont vérifiés SOUS verrou, puis débit + insertion de la transaction sont commités
+ensemble. La contrainte UNIQUE (device_id, transaction_id, occurred_at) est le filet de sécurité final.
 """
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -56,15 +62,14 @@ DUPLICATE_CODES = {ReasonCode.DUPLICATE_TRANSACTION, ReasonCode.TRANSACTION_ALRE
 
 @dataclass(frozen=True)
 class TransactionCommand:
-    """Données d'une transaction à traiter (identiques pour le temps réel et l'offline)."""
+    """Données d'un scan à traiter (identiques pour le temps réel et l'offline)."""
 
     transaction_id: str
-    card_token: str
+    card_tag: str
     device_id: str
     vehicle_id: str
     route_id: str
     fare: Decimal
-    currency: str
     occurred_at: datetime
 
 
@@ -76,7 +81,6 @@ class PaymentResult:
     message: str
     payment_method: PaymentMethod | None = None
     amount: Decimal | None = None
-    currency: str | None = None
     balance_before: Decimal | None = None
     balance_after: Decimal | None = None
     balance: Decimal | None = None
@@ -96,7 +100,7 @@ class PaymentResult:
             value = getattr(self, name)
             if value is not None:
                 data[name] = float(value) if as_float else value
-        for name in ("currency", "original_status", "original_reason_code"):
+        for name in ("original_status", "original_reason_code"):
             value = getattr(self, name)
             if value is not None:
                 data[name] = value
@@ -128,34 +132,36 @@ class PaymentService:
         subscriptions: SubscriptionRepository,
         routes: RouteRepository,
         transactions: TransactionRepository,
+        trip_window_minutes: int = 60,
     ):
         self.db = db
         self.cards = cards
         self.subscriptions = subscriptions
         self.routes = routes
         self.transactions = transactions
+        self.trip_window = timedelta(minutes=trip_window_minutes)
 
     # ------------------------------------------------------------------ API publique
 
     def process_transaction(self, cmd: TransactionCommand) -> PaymentResult:
-        """Traite une transaction de façon atomique et idempotente.
+        """Traite un scan de façon atomique et idempotente.
 
-        Lève une `AppError` (CARD_NOT_FOUND, INVALID_*, DUPLICATE_TRANSACTION, ...) quand la
-        transaction ne peut pas être traitée ; retourne un `PaymentResult` (APPROVED ou DECLINED)
-        sinon.
+        Lève une `AppError` (CARD_NOT_FOUND, INVALID_*, DUPLICATE_TRANSACTION, ...) quand le scan ne peut
+        pas être traité ; retourne un `PaymentResult` (APPROVED ou DECLINED) sinon.
         """
+        occurred_at = _to_utc(cmd.occurred_at)
         try:
-            existing = self.transactions.get_by_transaction_id(cmd.transaction_id)
+            existing = self.transactions.get_by_scan(cmd.device_id, cmd.transaction_id, occurred_at)
             if existing is not None:
                 raise self._duplicate_error(existing, cmd)
-            result = self._process_new(cmd)
+            result = self._process_new(cmd, occurred_at)
             self.db.commit()
             return result
         except IntegrityError:
-            # Course perdue sur la contrainte UNIQUE(transaction_id) : un autre processus a inséré
-            # la même transaction entre-temps. Rien n'a été débité par cette requête.
+            # Course perdue sur la contrainte UNIQUE(device_id, transaction_id, occurred_at) : une autre requête a inséré
+            # le même scan entre-temps. Rien n'a été débité par cette requête.
             self.db.rollback()
-            existing = self.transactions.get_by_transaction_id(cmd.transaction_id)
+            existing = self.transactions.get_by_scan(cmd.device_id, cmd.transaction_id, occurred_at)
             if existing is None:
                 raise
             error = self._duplicate_error(existing, cmd)
@@ -166,7 +172,7 @@ class PaymentService:
             raise
 
     def process_batch(self, device_id: str, commands: Sequence[TransactionCommand]) -> BatchResult:
-        """Synchronisation offline : chaque transaction est traitée indépendamment, dans l'ordre."""
+        """Synchronisation offline : chaque scan est traité indépendamment, dans l'ordre."""
         results = [self._process_safely(cmd) for cmd in commands]
         approved = sum(1 for r in results if r.status == TransactionStatus.APPROVED)
         duplicates = sum(1 for r in results if r.reason_code in DUPLICATE_CODES)
@@ -214,25 +220,35 @@ class PaymentService:
                 message=MESSAGES[ReasonCode.INTERNAL_ERROR],
             )
 
-    def _process_new(self, cmd: TransactionCommand) -> PaymentResult:
+    def _process_new(self, cmd: TransactionCommand, occurred_at: datetime) -> PaymentResult:
         # Verrou de ligne sur la carte : sérialise tous les traitements concernant cette carte.
-        card = self.cards.get_by_token(cmd.card_token, for_update=True)
+        card = self.cards.get_by_tag(cmd.card_tag, for_update=True)
         if card is None:
             raise CardNotFoundError()
 
         # Re-vérification du doublon SOUS verrou (une requête concurrente a pu commiter entre-temps).
-        existing = self.transactions.get_by_transaction_id(cmd.transaction_id)
+        existing = self.transactions.get_by_scan(cmd.device_id, cmd.transaction_id, occurred_at)
         if existing is not None:
             raise self._duplicate_error(existing, cmd)
 
-        fare = self._validate_fare(cmd, card)
+        fare = self._validate_fare(cmd)
         if self.routes.get_active_by_code(cmd.route_id) is None:
             raise InvalidRouteError()
-        occurred_at = _to_utc(cmd.occurred_at)
 
         if card.status != CardStatus.ACTIVE.value:
             reason = ReasonCode.CARD_EXPIRED if card.status == CardStatus.EXPIRED.value else ReasonCode.CARD_BLOCKED
             return self._record(card, cmd, fare, occurred_at, TransactionStatus.DECLINED, reason, None, fare)
+
+        # Règle du voyage : le même voyageur ne peut pas être validé/débité deux fois pour le même voyage.
+        # (vérifié sous le verrou de la carte -> deux scans simultanés ne peuvent pas passer tous les deux)
+        previous = self.transactions.find_approved_trip_scan(
+            card.id, cmd.vehicle_id, cmd.route_id, occurred_at, self.trip_window
+        )
+        if previous is not None:
+            return self._record(
+                card, cmd, fare, occurred_at, TransactionStatus.DECLINED,
+                ReasonCode.TRIP_ALREADY_VALIDATED, None, fare,
+            )
 
         if self.subscriptions.has_valid_subscription_for_route(card.id, cmd.route_id, occurred_at):
             return self._record(
@@ -257,14 +273,12 @@ class PaymentService:
         )
 
     @staticmethod
-    def _validate_fare(cmd: TransactionCommand, card: Card) -> Decimal:
+    def _validate_fare(cmd: TransactionCommand) -> Decimal:
         fare = cmd.fare
         if not fare.is_finite() or fare <= 0 or fare > MAX_FARE:
             raise InvalidFareError("Le tarif doit être strictement positif.")
         if fare != fare.quantize(THREE_PLACES):
             raise InvalidFareError("Le tarif ne peut pas avoir plus de 3 décimales.")
-        if cmd.currency.upper() != card.currency:
-            raise InvalidFareError(f"Devise invalide : {card.currency} attendu.")
         return fare.quantize(THREE_PLACES)
 
     def _record(
@@ -311,7 +325,6 @@ class PaymentService:
             message=MESSAGES[reason],
             payment_method=PaymentMethod(tx.payment_method) if tx.payment_method else None,
             amount=Decimal(tx.amount).quantize(THREE_PLACES),
-            currency=tx.currency,
         )
         if reason == ReasonCode.INSUFFICIENT_BALANCE and tx.balance_before is not None:
             result.balance = Decimal(tx.balance_before).quantize(THREE_PLACES)
@@ -324,7 +337,7 @@ class PaymentService:
         """Construit l'erreur de doublon en conservant le résultat initial dans `details`."""
         original = self._to_result(existing)
         same_payload = (
-            existing.card.card_token == cmd.card_token
+            existing.card.card_tag == cmd.card_tag
             and existing.route_id == cmd.route_id
             and existing.fare == cmd.fare
         )

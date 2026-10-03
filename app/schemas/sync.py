@@ -10,16 +10,15 @@ from app.schemas.transaction import Money
 
 class SyncTransactionItem(BaseModel):
     transaction_id: str = Field(min_length=1, max_length=64)
-    card_token: str = Field(min_length=1, max_length=128)
+    card_tag: str = Field(pattern=r"^[0-9]{10}$", description="10 chiffres, en texte.")
     vehicle_id: str = Field(min_length=1, max_length=64)
     route_id: str = Field(min_length=1, max_length=64)
     fare: Decimal
-    currency: str = Field(pattern=r"^[A-Za-z]{3}$")
     occurred_at: datetime
 
 
 class SyncRequest(BaseModel):
-    device_id: str = Field(min_length=1, max_length=64)
+    device_id: str = Field(min_length=1, max_length=64, description="Scanner émetteur du lot (valable pour toutes les transactions).")
     transactions: list[SyncTransactionItem] = Field(min_length=1, max_length=1000)
 
 
@@ -30,7 +29,6 @@ class SyncItemResult(BaseModel):
     message: str | None = None
     payment_method: PaymentMethod | None = None
     amount: Money | None = None
-    currency: str | None = None
     balance_before: Money | None = None
     balance_after: Money | None = None
     original_status: str | None = Field(None, description="Pour un doublon : statut du traitement initial.")

@@ -13,12 +13,12 @@ SYNC_EXAMPLES = {
         "value": {
             "device_id": "SCANNER-001",
             "transactions": [
-                {"transaction_id": "OFFLINE-000001", "card_token": "CARD-TEST-001", "vehicle_id": "BUS-001",
-                 "route_id": "ROUTE-001", "fare": 0.8, "currency": "TND", "occurred_at": "2026-09-30T18:30:00Z"},
-                {"transaction_id": "OFFLINE-000002", "card_token": "CARD-TEST-002", "vehicle_id": "BUS-001",
-                 "route_id": "ROUTE-002", "fare": 0.8, "currency": "TND", "occurred_at": "2026-09-30T18:31:00Z"},
-                {"transaction_id": "OFFLINE-000001", "card_token": "CARD-TEST-001", "vehicle_id": "BUS-001",
-                 "route_id": "ROUTE-001", "fare": 0.8, "currency": "TND", "occurred_at": "2026-09-30T18:30:00Z"},
+                {"transaction_id": "OFFLINE-000001", "card_tag": "1000000001", "vehicle_id": "BUS-001",
+                 "route_id": "ROUTE-001", "fare": 0.8, "occurred_at": "2026-09-30T18:30:00Z"},
+                {"transaction_id": "OFFLINE-000002", "card_tag": "1000000002", "vehicle_id": "BUS-001",
+                 "route_id": "ROUTE-002", "fare": 0.8, "occurred_at": "2026-09-30T18:31:00Z"},
+                {"transaction_id": "OFFLINE-000001", "card_tag": "1000000001", "vehicle_id": "BUS-001",
+                 "route_id": "ROUTE-001", "fare": 0.8, "occurred_at": "2026-09-30T18:30:00Z"},
             ],
         },
     }
@@ -62,7 +62,7 @@ def sync_transactions(
     """Traite, dans l'ordre, un lot de transactions stockées hors ligne par le scanner.
 
     Chaque transaction passe par **le même `PaymentService`** que `POST /payments`.
-    Un `transaction_id` déjà connu n'est jamais retraité : il est renvoyé en
+    Un `transaction_id` déjà connu pour ce scanner n'est jamais retraité : il est renvoyé en
     `DUPLICATE_TRANSACTION` (avec le statut initial dans `original_status`).
     Une erreur sur une transaction (carte inconnue, ligne invalide...) n'empêche pas les suivantes.
     """
