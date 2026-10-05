@@ -14,11 +14,11 @@ SYNC_EXAMPLES = {
             "device_id": "SCANNER-001",
             "transactions": [
                 {"transaction_id": "OFFLINE-000001", "card_tag": "1000000001", "vehicle_id": "BUS-001",
-                 "route_id": "ROUTE-001", "fare": 0.8, "occurred_at": "2026-09-30T18:30:00Z"},
+                 "line_number": "22A", "occurred_at": "2026-09-30T18:30:00Z"},
                 {"transaction_id": "OFFLINE-000002", "card_tag": "1000000002", "vehicle_id": "BUS-001",
-                 "route_id": "ROUTE-002", "fare": 0.8, "occurred_at": "2026-09-30T18:31:00Z"},
+                 "line_number": "22A", "occurred_at": "2026-09-30T18:31:00Z"},
                 {"transaction_id": "OFFLINE-000001", "card_tag": "1000000001", "vehicle_id": "BUS-001",
-                 "route_id": "ROUTE-001", "fare": 0.8, "occurred_at": "2026-09-30T18:30:00Z"},
+                 "line_number": "22A", "occurred_at": "2026-09-30T18:30:00Z"},
             ],
         },
     }

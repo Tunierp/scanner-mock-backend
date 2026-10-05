@@ -1,6 +1,6 @@
 """Tests de concurrence : uniquement avec PostgreSQL (SQLite ne supporte pas SELECT ... FOR UPDATE).
 
-    TEST_DATABASE_URL=postgresql+psycopg://scanner:scanner@localhost:5432/scanner_mock_test pytest tests/test_concurrency.py
+    TEST_DATABASE_URL=postgresql+psycopg://scanner:scanner@localhost:5432/test_navio_db pytest tests/test_concurrency.py
 """
 from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
@@ -26,7 +26,7 @@ def test_same_transaction_id_sent_concurrently_is_debited_once():
         responses = list(pool.map(_post, payloads))
     assert [r.status_code for r in responses].count(200) == 1
     assert all(r.status_code in (200, 409) for r in responses)
-    assert balance_of(CARD_OK) == Decimal("9.200")
+    assert balance_of(CARD_OK) == Decimal("8.800")
     assert transaction_count("TRX-RACE") == 1
 
 
@@ -38,13 +38,13 @@ def test_concurrent_double_scans_of_the_same_trip_are_debited_once():
     reasons = [r.json()["data"]["reason_code"] for r in responses]
     assert reasons.count("BALANCE_DEBITED") == 1
     assert reasons.count("TRIP_ALREADY_VALIDATED") == 9
-    assert balance_of(CARD_OK) == Decimal("9.200")
+    assert balance_of(CARD_OK) == Decimal("8.800")
 
 
 def test_concurrent_payments_never_overdraw_the_card():
     with SessionLocal() as session:
         card = session.query(Card).filter_by(card_tag=CARD_OK).one()
-        card.balance = Decimal("2.000")  # 2.000 / 0.800 => exactement 2 paiements possibles
+        card.balance = Decimal("3.000")  # 3.000 / 1.200 => exactement 2 paiements possibles
         session.commit()
     # véhicules différents : ce sont bien 10 voyages distincts
     payloads = [
@@ -55,4 +55,4 @@ def test_concurrent_payments_never_overdraw_the_card():
     statuses = [r.json()["data"]["status"] for r in responses]
     assert statuses.count("APPROVED") == 2
     assert statuses.count("DECLINED") == 8
-    assert balance_of(CARD_OK) == Decimal("0.400")
+    assert balance_of(CARD_OK) == Decimal("0.600")

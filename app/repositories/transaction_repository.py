@@ -23,7 +23,7 @@ class TransactionRepository:
         return self.db.scalar(stmt)
 
     def find_approved_trip_scan(
-        self, card_id: int, vehicle_id: str, route_id: str, at: datetime, window: timedelta
+        self, card_id: int, vehicle_id: str, line_id: int, at: datetime, window: timedelta
     ) -> Transaction | None:
         """Cherche un scan APPROVED de la même carte, dans le même véhicule, sur la même ligne,
         dans la fenêtre [at - window, at + window] (symétrique : l'ordre d'arrivée n'a pas d'importance)."""
@@ -32,7 +32,7 @@ class TransactionRepository:
             .where(
                 Transaction.card_id == card_id,
                 Transaction.vehicle_id == vehicle_id,
-                Transaction.route_id == route_id,
+                Transaction.line_id == line_id,
                 Transaction.status == TransactionStatus.APPROVED.value,
                 Transaction.occurred_at >= at - window,
                 Transaction.occurred_at <= at + window,

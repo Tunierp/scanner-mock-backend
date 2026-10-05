@@ -1,6 +1,5 @@
 """Schémas de requête : paiement / validation temps réel."""
 from datetime import datetime
-from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,8 +13,7 @@ class PaymentRequest(BaseModel):
                     "card_tag": "1258465854",
                     "device_id": "SCANNER-001",
                     "vehicle_id": "BUS-001",
-                    "route_id": "ROUTE-001",
-                    "fare": 0.8,
+                    "line_number": "22A",
                     "occurred_at": "2026-09-30T18:30:00Z",
                 }
             ]
@@ -37,6 +35,12 @@ class PaymentRequest(BaseModel):
     )
     device_id: str = Field(min_length=1, max_length=64, description="Identifiant unique du scanner.")
     vehicle_id: str = Field(min_length=1, max_length=64, description="Identifiant du véhicule (bus, train...).")
-    route_id: str = Field(min_length=1, max_length=64, description="Code de la ligne (ex. ROUTE-001).")
-    fare: Decimal = Field(description="Tarif du voyage (> 0, 3 décimales max). INVALID_FARE sinon.")
+    line_number: str = Field(
+        min_length=1,
+        max_length=16,
+        description=(
+            "Numéro de la ligne (ex. \"22A\" pour « 22A - Sousse - Msaken »). Une ligne couvre les DEUX sens. "
+            "Le tarif n'est pas envoyé : le serveur le lit en base (ligne + date du scan)."
+        ),
+    )
     occurred_at: datetime = Field(description="Date/heure du scan (ISO 8601, UTC recommandé, ex. 2026-09-30T18:30:00Z).")

@@ -3,7 +3,7 @@
 Par défaut les tests utilisent SQLite en mémoire (rapide, sans dépendance).
 Pour tester contre PostgreSQL (verrous SELECT ... FOR UPDATE réels + test de concurrence) :
 
-    TEST_DATABASE_URL=postgresql+psycopg://scanner:scanner@localhost:5433/scanner_mock pytest
+    TEST_DATABASE_URL=postgresql+psycopg://scanner:scanner@localhost:5432/test_navio_db pytest
 
 ⚠ La base ciblée est vidée (drop_all) avant chaque test : utilisez une base dédiée aux tests.
 """
@@ -23,16 +23,28 @@ from app.models import Base, Card, Transaction  # noqa: E402
 from app.seed import seed  # noqa: E402
 
 # Cartes de test (voir app/seed.py)
-CARD_SUB = "1000000001"      # 10.000 TND, abonnement ROUTE-001
+CARD_SUB = "1000000001"      # 10.000 TND, abonnement lignes 22A, 52A, 61
 CARD_LOW = "1000000002"      # 0.300 TND
 CARD_OK = "1000000003"       # 10.000 TND, sans abonnement
 CARD_BLOCKED = "1000000004"  # bloquée
-CARD_SUB_R3 = "1000000005"   # 10.000 TND, abonnement ROUTE-003
+CARD_SUB_L = "1000000005"    # 10.000 TND, abonnement ligne 61
 CARD_EXPIRED = "1000000006"  # expirée
-CARD_OLD_SUB = "1000000007"  # abonnement périmé
+CARD_OLD_SUB = "1000000007"  # abonnement (ligne 22A) périmé
 CARD_A = "1258465854"        # 10.000 TND, sans abonnement
 CARD_B = "1258465855"        # 10.000 TND, sans abonnement
+CARD_FREE = "1000000008"     # catégorie Handicapé (gratuité sur toutes les lignes)
+CARD_LOST = "1000000009"     # perdue (utilisatrice Rim)
+CARD_REPLACED = "1000000010" # remplacée (Rim)
+CARD_RIM_ACTIVE = "1000000011"  # carte active de Rim
+CARD_INACTIVE = "1000000012" # non active
+CARD_AHMAD = "1236547895"    # 2 abonnements : Universitaire (13C, 16) + Passager (52A)
 CARD_UNKNOWN = "9999999999"
+
+# Lignes : seule la 22A a des tarifs (1.100 depuis 2023-05-12, 1.200 depuis 2025-01-01)
+L22A = "22A"   # Sousse - Msaken
+L52A = "52A"   # Sousse - Monastir (sans tarif, dans l'abonnement SUB-001)
+L61 = "61"     # Sousse - Jammel (sans tarif, dans SUB-001 et SUB-002)
+L28 = "28"     # Sousse - Messadine (sans tarif, dans aucun abonnement)
 
 PAYMENTS_URL = "/api/v1/scanner/payments"
 SYNC_URL = "/api/v1/scanner/sync/transactions"
@@ -58,8 +70,7 @@ def payment_payload(**overrides) -> dict:
         "card_tag": CARD_SUB,
         "device_id": "SCANNER-001",
         "vehicle_id": "BUS-001",
-        "route_id": "ROUTE-001",
-        "fare": 0.8,
+        "line_number": L22A,
         "occurred_at": "2026-09-30T18:30:00Z",
     }
     payload.update(overrides)

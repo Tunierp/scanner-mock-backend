@@ -1,0 +1,1 @@
+CREATE DATABASE test_navio_db OWNER scanner ENCODING 'UTF8';

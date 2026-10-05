@@ -1,51 +1,71 @@
 """Données de test (idempotent).
 
 Usage :
-    python -m app.seed            # crée ce qui manque
-    python -m app.seed --reset    # remet soldes/statuts à l'état initial et purge les transactions
+    python -m app.seed            # crée ce qui manque (lignes, tarifs, catégories, périodes, utilisateurs, cartes, abonnements)
+    python -m app.seed --reset    # remet soldes/états des cartes de test à l'état initial et purge les transactions
+
+Voir app/data/sts_lines.py (lignes, tarifs au trajet) et app/data/subscription_catalog.py (catégories, périodes, tarifs d'abonnement).
 """
 import sys
-from datetime import UTC, datetime
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.constants import CardStatus, EntityStatus
+from app.data.sts_lines import LINE_FARES, STS_LINES
+from app.data.subscription_catalog import CATEGORIES, PERIODS, SUBSCRIPTION_TARIFFS
 from app.dependencies.database import SessionLocal
 from app.models import (
     Card,
-    CardSubscription,
-    Route,
+    Category,
+    Line,
+    LineFare,
     Subscription,
-    SubscriptionRoute,
+    SubscriptionPeriod,
+    SubscriptionTariff,
     Transaction,
+    User,
 )
+from app.services.card_service import CardService
+from app.services.subscription_service import SubscriptionService
+from app.services.user_service import UserService
 
-VALID_FROM = datetime(2026, 1, 1, tzinfo=UTC)
-VALID_UNTIL = datetime(2036, 12, 31, 23, 59, 59, tzinfo=UTC)
-EXPIRED_UNTIL = datetime(2025, 12, 31, 23, 59, 59, tzinfo=UTC)
+START_2026 = date(2026, 1, 1)
+START_2025 = date(2025, 1, 1)
 
-ROUTES = {"ROUTE-001": "Ligne 1", "ROUTE-002": "Ligne 2", "ROUTE-003": "Ligne 3"}
-
-SUBSCRIPTIONS = {
-    "SUB-001": ("Abonnement ligne 1", ["ROUTE-001"]),
-    "SUB-002": ("Abonnement ligne 3", ["ROUTE-003"]),
-    "SUB-EXPIRED": ("Abonnement ligne 1 (périmé)", ["ROUTE-001"]),
+# Utilisateurs nommés (les autres cartes reçoivent un utilisateur « Utilisateur Test <carte> »)
+USERS = {
+    "ahmad": ("Ahmad", "Test"),
+    "rim": ("Rim", "Test"),
+    "handicap": ("Utilisateur", "Handicapé Test"),
 }
 
-# (card_tag, status, balance, [(subscription_name, valid_from, valid_until)])
-CARDS = [
-    ("1000000001", CardStatus.ACTIVE, "10.000", [("SUB-001", VALID_FROM, VALID_UNTIL)]),
-    ("1000000002", CardStatus.ACTIVE, "0.300", []),
-    ("1000000003", CardStatus.ACTIVE, "10.000", []),
-    ("1000000004", CardStatus.BLOCKED, "10.000", []),
-    ("1000000005", CardStatus.ACTIVE, "10.000", [("SUB-002", VALID_FROM, VALID_UNTIL)]),
-    ("1000000006", CardStatus.EXPIRED, "10.000", []),
-    ("1000000007", CardStatus.ACTIVE, "10.000", [("SUB-EXPIRED", VALID_FROM, EXPIRED_UNTIL)]),
-    # Cartes pour le scénario « deux bus » (sans abonnement)
-    ("1258465854", CardStatus.ACTIVE, "10.000", []),
-    ("1258465855", CardStatus.ACTIVE, "10.000", []),
+# (card_tag, utilisateur, état, solde, [(catégorie, période, début, [numéros de lignes])])
+# Un utilisateur peut avoir plusieurs cartes (historique) mais une seule ACTIVE.
+CARDS: list[tuple[str, str | None, CardStatus, str, list[tuple[str, str, date, list[str]]]]] = [
+    ("1000000001", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2026, ["22A", "52A", "61"])]),
+    ("1000000002", None, CardStatus.ACTIVE, "0.300", []),
+    ("1000000003", None, CardStatus.ACTIVE, "10.000", []),
+    ("1000000004", None, CardStatus.BLOCKED, "10.000", []),
+    ("1000000005", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2026, ["61"])]),
+    ("1000000006", None, CardStatus.EXPIRED, "10.000", []),
+    ("1000000007", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2025, ["22A"])]),  # périmé fin 2025
+    ("1000000008", "handicap", CardStatus.ACTIVE, "10.000", [("DISABLED", "ANNUAL", START_2026, [])]),
+    # Historique de cartes d'une même utilisatrice : perdue, remplacée, puis la carte active
+    ("1000000009", "rim", CardStatus.LOST, "10.000", []),
+    ("1000000010", "rim", CardStatus.REPLACED, "10.000", []),
+    ("1000000011", "rim", CardStatus.ACTIVE, "10.000", []),
+    ("1000000012", None, CardStatus.INACTIVE, "10.000", []),
+    # Exemple de l'énoncé : une carte, deux abonnements (catégories et lignes différentes)
+    ("1236547895", "ahmad", CardStatus.ACTIVE, "10.000", [
+        ("UNIVERSITY", "ANNUAL", START_2026, ["13C", "16"]),
+        ("PASSENGER", "ANNUAL", START_2026, ["52A"]),
+    ]),
+    # Scénario « deux bus »
+    ("1258465854", None, CardStatus.ACTIVE, "10.000", []),
+    ("1258465855", None, CardStatus.ACTIVE, "10.000", []),
 ]
 
 
@@ -53,64 +73,86 @@ def seed(db: Session, reset: bool = False) -> None:
     if reset:
         db.execute(delete(Transaction))
 
-    routes: dict[str, Route] = {}
-    for code, name in ROUTES.items():
-        route = db.scalar(select(Route).where(Route.code == code))
-        if route is None:
-            route = Route(code=code, name=name, status=EntityStatus.ACTIVE.value)
-            db.add(route)
-        routes[code] = route
+    # --- lignes et tarifs au trajet
+    lines: dict[str, Line] = {}
+    for number, departure, destination, via in STS_LINES:
+        line = db.scalar(select(Line).where(Line.number == number))
+        if line is None:
+            line = Line(number=number, departure=departure, destination=destination, via=via,
+                        status=EntityStatus.ACTIVE.value)
+            db.add(line)
+        lines[number] = line
+    db.flush()
+    for number, amount, valid_from in LINE_FARES:
+        if db.scalar(select(LineFare.id).where(LineFare.line_id == lines[number].id,
+                                                LineFare.valid_from == valid_from)) is None:
+            db.add(LineFare(line_id=lines[number].id, amount=Decimal(amount), valid_from=valid_from))
     db.flush()
 
-    subscriptions: dict[str, Subscription] = {}
-    for name, (description, route_codes) in SUBSCRIPTIONS.items():
-        subscription = db.scalar(select(Subscription).where(Subscription.name == name))
-        if subscription is None:
-            subscription = Subscription(name=name, description=description, status=EntityStatus.ACTIVE.value)
-            db.add(subscription)
-            db.flush()
-        for code in route_codes:
-            link = db.scalar(
-                select(SubscriptionRoute).where(
-                    SubscriptionRoute.subscription_id == subscription.id,
-                    SubscriptionRoute.route_id == routes[code].id,
-                )
+    # --- catégories, périodes, tarifs d'abonnement
+    categories: dict[str, Category] = {}
+    for code, name, free_travel in CATEGORIES:
+        category = db.scalar(select(Category).where(Category.code == code))
+        if category is None:
+            category = Category(code=code, name=name, free_travel=free_travel, status=EntityStatus.ACTIVE.value)
+            db.add(category)
+        categories[code] = category
+    periods: dict[str, SubscriptionPeriod] = {}
+    for code, name, months in PERIODS:
+        period = db.scalar(select(SubscriptionPeriod).where(SubscriptionPeriod.code == code))
+        if period is None:
+            period = SubscriptionPeriod(code=code, name=name, months=months, status=EntityStatus.ACTIVE.value)
+            db.add(period)
+        periods[code] = period
+    db.flush()
+    for number, cat_code, period_code, amount, valid_from in SUBSCRIPTION_TARIFFS:
+        exists = db.scalar(
+            select(SubscriptionTariff.id).where(
+                SubscriptionTariff.category_id == categories[cat_code].id,
+                SubscriptionTariff.line_id == lines[number].id,
+                SubscriptionTariff.period_id == periods[period_code].id,
+                SubscriptionTariff.valid_from == valid_from,
             )
-            if link is None:
-                db.add(SubscriptionRoute(subscription_id=subscription.id, route_id=routes[code].id))
-        subscriptions[name] = subscription
+        )
+        if exists is None:
+            db.add(SubscriptionTariff(
+                category_id=categories[cat_code].id, line_id=lines[number].id, period_id=periods[period_code].id,
+                amount=Decimal(amount), valid_from=valid_from,
+            ))
     db.flush()
 
-    for tag, status, balance, subs in CARDS:
+    # --- utilisateurs, cartes, abonnements
+    user_service = UserService.from_session(db)
+    card_service = CardService.from_session(db)
+    subscription_service = SubscriptionService.from_session(db)
+
+    for tag, user_key, status, balance, subscriptions in CARDS:
+        first_name, last_name = USERS.get(user_key or "", ("Utilisateur", f"Test {tag}"))
+        user = db.scalar(select(User).where(User.first_name == first_name, User.last_name == last_name))
+        if user is None:
+            user = user_service.create_user(first_name, last_name)
         card = db.scalar(select(Card).where(Card.card_tag == tag))
         if card is None:
-            card = Card(card_tag=tag, status=status.value, balance=Decimal(balance), currency="TND")
-            db.add(card)
-            db.flush()
+            card = card_service.issue_card(user, tag, status=status, balance=Decimal(balance))
         elif reset:
             card.status = status.value
             card.balance = Decimal(balance)
-        for sub_name, valid_from, valid_until in subs:
-            card_sub = db.scalar(
-                select(CardSubscription).where(
-                    CardSubscription.card_id == card.id,
-                    CardSubscription.subscription_id == subscriptions[sub_name].id,
+            db.flush()
+        for cat_code, period_code, start, line_numbers in subscriptions:
+            exists = db.scalar(
+                select(Subscription.id).where(
+                    Subscription.card_id == card.id,
+                    Subscription.category_id == categories[cat_code].id,
+                    Subscription.period_id == periods[period_code].id,
+                    Subscription.valid_from == start,
                 )
             )
-            if card_sub is None:
-                db.add(
-                    CardSubscription(
-                        card_id=card.id,
-                        subscription_id=subscriptions[sub_name].id,
-                        valid_from=valid_from,
-                        valid_until=valid_until,
-                        status=EntityStatus.ACTIVE.value,
-                    )
-                )
+            if exists is None:
+                subscription_service.create_subscription(card, cat_code, period_code, line_numbers, start)
     db.commit()
 
 
 if __name__ == "__main__":
     with SessionLocal() as session:
         seed(session, reset="--reset" in sys.argv)
-    print("Données de test prêtes." if "--reset" not in sys.argv else "Données de test réinitialisées.")
+    print("Données de test réinitialisées." if "--reset" in sys.argv else "Données de test prêtes.")

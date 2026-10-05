@@ -10,11 +10,13 @@ class Settings(BaseSettings):
 
     app_name: str = "Scanner Transport - Backend de test (MOCK)"
     app_version: str = "1.0.0"
-    database_url: str = "postgresql+psycopg://scanner:scanner@localhost:5432/scanner_mock"
+    database_url: str = "postgresql+psycopg://scanner:scanner@localhost:5432/sts_navio_db"
     log_level: str = "INFO"
     # Fenêtre (en minutes) pendant laquelle un 2e scan de la même carte, dans le même véhicule et sur
     # la même ligne, est considéré comme le MÊME voyage (-> TRIP_ALREADY_VALIDATED).
     trip_window_minutes: int = Field(default=60, ge=1)
+    # Fuseau horaire servant à déterminer la DATE (locale) du scan pour choisir le tarif applicable.
+    tariff_timezone: str = "Africa/Tunis"
 
 
 @lru_cache

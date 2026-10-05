@@ -1,15 +1,21 @@
 from app.models.base import Base
 from app.models.card import Card
-from app.models.route import Route
-from app.models.subscription import CardSubscription, Subscription, SubscriptionRoute
+from app.models.category import Category
+from app.models.line import Line, LineFare
+from app.models.subscription import Subscription, SubscriptionLine, SubscriptionPeriod, SubscriptionTariff
 from app.models.transaction import Transaction
+from app.models.user import User
 
 __all__ = [
     "Base",
     "Card",
-    "CardSubscription",
-    "Route",
+    "Category",
+    "Line",
+    "LineFare",
     "Subscription",
-    "SubscriptionRoute",
+    "SubscriptionLine",
+    "SubscriptionPeriod",
+    "SubscriptionTariff",
     "Transaction",
+    "User",
 ]

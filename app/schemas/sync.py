@@ -1,6 +1,5 @@
 """Schémas : synchronisation offline."""
 from datetime import datetime
-from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
@@ -12,8 +11,7 @@ class SyncTransactionItem(BaseModel):
     transaction_id: str = Field(min_length=1, max_length=64)
     card_tag: str = Field(pattern=r"^[0-9]{10}$", description="10 chiffres, en texte.")
     vehicle_id: str = Field(min_length=1, max_length=64)
-    route_id: str = Field(min_length=1, max_length=64)
-    fare: Decimal
+    line_number: str = Field(min_length=1, max_length=16, description="Numéro de la ligne (ex. 22A).")
     occurred_at: datetime
 
 

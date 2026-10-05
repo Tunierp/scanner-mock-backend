@@ -29,14 +29,14 @@ class CardNotFoundError(AppError):
     code = ReasonCode.CARD_NOT_FOUND
 
 
-class InvalidRouteError(AppError):
+class InvalidLineError(AppError):
     http_status = 400
-    code = ReasonCode.INVALID_ROUTE
+    code = ReasonCode.INVALID_LINE
 
 
-class InvalidFareError(AppError):
-    http_status = 400
-    code = ReasonCode.INVALID_FARE
+class FareNotFoundError(AppError):
+    http_status = 404
+    code = ReasonCode.FARE_NOT_FOUND
 
 
 class DuplicateTransactionError(AppError):
@@ -47,6 +47,26 @@ class DuplicateTransactionError(AppError):
 class TransactionAlreadyProcessedError(AppError):
     http_status = 409
     code = ReasonCode.TRANSACTION_ALREADY_PROCESSED
+
+
+class ActiveCardAlreadyExistsError(AppError):
+    http_status = 409
+    code = ReasonCode.ACTIVE_CARD_ALREADY_EXISTS
+
+
+class CategoryNotFoundError(AppError):
+    http_status = 404
+    code = ReasonCode.CATEGORY_NOT_FOUND
+
+
+class PeriodNotFoundError(AppError):
+    http_status = 404
+    code = ReasonCode.PERIOD_NOT_FOUND
+
+
+class SubscriptionTariffNotFoundError(AppError):
+    http_status = 404
+    code = ReasonCode.SUBSCRIPTION_TARIFF_NOT_FOUND
 
 
 class InternalError(AppError):

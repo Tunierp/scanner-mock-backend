@@ -5,12 +5,17 @@ Utilisé à la fois par POST /api/v1/scanner/payments et POST /api/v1/scanner/sy
 Ordre des règles pour une transaction :
   1. même scan déjà traité (device_id + transaction_id + occurred_at) -> DUPLICATE_TRANSACTION (409)
   2. carte inconnue                         -> CARD_NOT_FOUND (404)
-  3. tarif / ligne invalides                -> INVALID_FARE / INVALID_ROUTE (400)
-  4. carte bloquée / expirée                -> DECLINED (CARD_BLOCKED / CARD_EXPIRED)
+  3. ligne inconnue ou inactive             -> INVALID_LINE (400)
+     (le tarif n'est PAS envoyé par le scanner : il est lu en base, par ligne et par date du scan)
+  4. carte non active (bloquée, expirée, perdue, remplacée, inactive) -> DECLINED (CARD_BLOCKED, CARD_EXPIRED,
+     CARD_LOST, CARD_REPLACED, CARD_NOT_ACTIVE)
   5. même carte, même véhicule, même ligne, déjà validée dans la fenêtre de voyage
                                             -> DECLINED / TRIP_ALREADY_VALIDATED (aucun débit)
-  6. abonnement valide pour la ligne        -> APPROVED / VALID_SUBSCRIPTION (aucun débit)
-  7. solde suffisant                        -> APPROVED / BALANCE_DEBITED
+  6. abonnement d'une catégorie à gratuité totale (ex. Handicapé), valide -> APPROVED / FREE_TRAVEL_CATEGORY
+     (toutes les lignes, aucun débit)
+     abonnement valide qui contient la ligne -> APPROVED / VALID_SUBSCRIPTION (aucun débit)
+  7. aucun tarif pour cette ligne à cette date -> FARE_NOT_FOUND (404, rien n'est enregistré)
+     solde suffisant                        -> APPROVED / BALANCE_DEBITED
   8. solde insuffisant                      -> DECLINED / INSUFFICIENT_BALANCE (aucun débit)
 
 Deux protections distinctes (ne pas les confondre) :
@@ -27,13 +32,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
-    MAX_FARE,
     MESSAGES,
+    CARD_STATUS_REASONS,
     CardStatus,
     PaymentMethod,
     ReasonCode,
@@ -43,14 +49,16 @@ from app.core.exceptions import (
     AppError,
     CardNotFoundError,
     DuplicateTransactionError,
-    InvalidFareError,
-    InvalidRouteError,
+    FareNotFoundError,
+    InvalidLineError,
     TransactionAlreadyProcessedError,
 )
 from app.models.card import Card
+from app.models.line import Line
 from app.models.transaction import Transaction
 from app.repositories.card_repository import CardRepository
-from app.repositories.route_repository import RouteRepository
+from app.repositories.line_fare_repository import LineFareRepository
+from app.repositories.line_repository import LineRepository
 from app.repositories.subscription_repository import SubscriptionRepository
 from app.repositories.transaction_repository import TransactionRepository
 
@@ -68,8 +76,7 @@ class TransactionCommand:
     card_tag: str
     device_id: str
     vehicle_id: str
-    route_id: str
-    fare: Decimal
+    line_number: str
     occurred_at: datetime
 
 
@@ -130,16 +137,20 @@ class PaymentService:
         db: Session,
         cards: CardRepository,
         subscriptions: SubscriptionRepository,
-        routes: RouteRepository,
+        lines: LineRepository,
+        fares: LineFareRepository,
         transactions: TransactionRepository,
         trip_window_minutes: int = 60,
+        tariff_timezone: str = "Africa/Tunis",
     ):
         self.db = db
         self.cards = cards
         self.subscriptions = subscriptions
-        self.routes = routes
+        self.lines = lines
+        self.fares = fares
         self.transactions = transactions
         self.trip_window = timedelta(minutes=trip_window_minutes)
+        self.tariff_tz = ZoneInfo(tariff_timezone)
 
     # ------------------------------------------------------------------ API publique
 
@@ -231,35 +242,49 @@ class PaymentService:
         if existing is not None:
             raise self._duplicate_error(existing, cmd)
 
-        fare = self._validate_fare(cmd)
-        if self.routes.get_active_by_code(cmd.route_id) is None:
-            raise InvalidRouteError()
+        line = self.lines.get_active_by_number(cmd.line_number)
+        if line is None:
+            raise InvalidLineError()
+        occurred_local_date = occurred_at.astimezone(self.tariff_tz).date()
+        fare = self.fares.get_applicable(line.id, occurred_local_date)  # tarif d'UN sens, None si absent
+        shown = fare if fare is not None else Decimal("0.000")  # montant « demandé » indiqué dans un refus
 
         if card.status != CardStatus.ACTIVE.value:
-            reason = ReasonCode.CARD_EXPIRED if card.status == CardStatus.EXPIRED.value else ReasonCode.CARD_BLOCKED
-            return self._record(card, cmd, fare, occurred_at, TransactionStatus.DECLINED, reason, None, fare)
+            reason = CARD_STATUS_REASONS.get(card.status, ReasonCode.CARD_BLOCKED)
+            return self._record(card, line, cmd, fare, occurred_at, TransactionStatus.DECLINED, reason, None, shown)
 
         # Règle du voyage : le même voyageur ne peut pas être validé/débité deux fois pour le même voyage.
         # (vérifié sous le verrou de la carte -> deux scans simultanés ne peuvent pas passer tous les deux)
         previous = self.transactions.find_approved_trip_scan(
-            card.id, cmd.vehicle_id, cmd.route_id, occurred_at, self.trip_window
+            card.id, cmd.vehicle_id, line.id, occurred_at, self.trip_window
         )
         if previous is not None:
             return self._record(
-                card, cmd, fare, occurred_at, TransactionStatus.DECLINED,
-                ReasonCode.TRIP_ALREADY_VALIDATED, None, fare,
+                card, line, cmd, fare, occurred_at, TransactionStatus.DECLINED,
+                ReasonCode.TRIP_ALREADY_VALIDATED, None, shown,
             )
 
-        if self.subscriptions.has_valid_subscription_for_route(card.id, cmd.route_id, occurred_at):
+        # Catégorie à gratuité totale (ex. Handicapé) : toutes les lignes sont gratuites, quel que soit le tarif.
+        if self.subscriptions.has_free_travel_subscription(card.id, occurred_local_date):
             return self._record(
-                card, cmd, fare, occurred_at, TransactionStatus.APPROVED,
+                card, line, cmd, fare, occurred_at, TransactionStatus.APPROVED,
+                ReasonCode.FREE_TRAVEL_CATEGORY, PaymentMethod.SUBSCRIPTION, Decimal("0.000"),
+            )
+
+        # Un abonnement couvre la ligne même si elle n'a pas (encore) de tarif.
+        if self.subscriptions.has_valid_subscription_for_line(card.id, line.id, occurred_local_date):
+            return self._record(
+                card, line, cmd, fare, occurred_at, TransactionStatus.APPROVED,
                 ReasonCode.VALID_SUBSCRIPTION, PaymentMethod.SUBSCRIPTION, Decimal("0.000"),
             )
+
+        if fare is None:
+            raise FareNotFoundError()
 
         balance_before = Decimal(card.balance).quantize(THREE_PLACES)
         if balance_before < fare:
             return self._record(
-                card, cmd, fare, occurred_at, TransactionStatus.DECLINED,
+                card, line, cmd, fare, occurred_at, TransactionStatus.DECLINED,
                 ReasonCode.INSUFFICIENT_BALANCE, None, fare,
                 balance_before=balance_before, balance_after=balance_before,
             )
@@ -267,25 +292,17 @@ class PaymentService:
         balance_after = balance_before - fare
         self.cards.set_balance(card, balance_after)
         return self._record(
-            card, cmd, fare, occurred_at, TransactionStatus.APPROVED,
+            card, line, cmd, fare, occurred_at, TransactionStatus.APPROVED,
             ReasonCode.BALANCE_DEBITED, PaymentMethod.CARD_BALANCE, fare,
             balance_before=balance_before, balance_after=balance_after,
         )
 
-    @staticmethod
-    def _validate_fare(cmd: TransactionCommand) -> Decimal:
-        fare = cmd.fare
-        if not fare.is_finite() or fare <= 0 or fare > MAX_FARE:
-            raise InvalidFareError("Le tarif doit être strictement positif.")
-        if fare != fare.quantize(THREE_PLACES):
-            raise InvalidFareError("Le tarif ne peut pas avoir plus de 3 décimales.")
-        return fare.quantize(THREE_PLACES)
-
     def _record(
         self,
         card: Card,
+        line: Line,
         cmd: TransactionCommand,
-        fare: Decimal,
+        fare: Decimal | None,
         occurred_at: datetime,
         status: TransactionStatus,
         reason: ReasonCode,
@@ -300,7 +317,7 @@ class PaymentService:
             card_id=card.id,
             device_id=cmd.device_id,
             vehicle_id=cmd.vehicle_id,
-            route_id=cmd.route_id,
+            line_id=line.id,
             fare=fare,
             amount=amount,
             currency=card.currency,
@@ -338,8 +355,7 @@ class PaymentService:
         original = self._to_result(existing)
         same_payload = (
             existing.card.card_tag == cmd.card_tag
-            and existing.route_id == cmd.route_id
-            and existing.fare == cmd.fare
+            and existing.line.number == cmd.line_number
         )
         error_cls = DuplicateTransactionError if same_payload else TransactionAlreadyProcessedError
         return error_cls(details=original.as_dict(as_float=True))
