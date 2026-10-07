@@ -166,7 +166,7 @@ def create_payment(
 
     1. Même carte déjà validée dans ce véhicule, sur cette ligne (même voyage) → `DECLINED / TRIP_ALREADY_VALIDATED`, aucun débit.
     2. Abonnement d'une catégorie à gratuité totale (ex. Handicapé) → `APPROVED / FREE_TRAVEL_CATEGORY`, toutes lignes, aucun débit.
-       Sinon abonnement actif contenant la ligne → `APPROVED / VALID_SUBSCRIPTION`, **aucun débit** (même sans tarif défini).
+       Sinon abonnement actif dont une liaison (corridor) est desservie par la ligne (22A et 22B pour « Sousse - Msaken ») → `APPROVED / VALID_SUBSCRIPTION`, **aucun débit** (même sans tarif défini).
     3. Sinon, tarif introuvable → 404 `FARE_NOT_FOUND`.
     4. Sinon, solde suffisant → débit + `APPROVED / BALANCE_DEBITED`.
     5. Sinon → `DECLINED / INSUFFICIENT_BALANCE`, solde inchangé.

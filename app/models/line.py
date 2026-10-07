@@ -11,7 +11,8 @@ from app.models.base import Base
 class Line(Base):
     """Ligne de transport, ex. « 22A - Sousse - Msaken ».
 
-    Une ligne représente les DEUX sens (Sousse → Msaken et Msaken → Sousse).
+    Une ligne représente les DEUX sens (Sousse → Msaken et Msaken → Sousse). C'est la ligne EXPLOITÉE (le numéro
+    que le scanner envoie) ; ce que l'on VEND dans un abonnement, ce sont des liaisons (`corridors`) qui regroupent des lignes.
     `via` = arrêts intermédiaires éventuels (texte libre).
     """
 
@@ -25,7 +26,7 @@ class Line(Base):
     status: Mapped[str] = mapped_column(String(20), default=EntityStatus.ACTIVE.value)
 
     fares: Mapped[list["LineFare"]] = relationship(back_populates="line", order_by="LineFare.valid_from")
-    subscription_lines: Mapped[list["SubscriptionLine"]] = relationship(back_populates="line")  # noqa: F821
+    corridor_lines: Mapped[list["CorridorLine"]] = relationship(back_populates="line")  # noqa: F821
 
     @property
     def label(self) -> str:

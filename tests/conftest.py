@@ -94,3 +94,4 @@ def transaction_count(transaction_id: str | None = None) -> int:
         if transaction_id:
             stmt = stmt.where(Transaction.transaction_id == transaction_id)
         return session.scalar(stmt)
+

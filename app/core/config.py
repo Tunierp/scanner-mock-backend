@@ -15,8 +15,14 @@ class Settings(BaseSettings):
     # Fenêtre (en minutes) pendant laquelle un 2e scan de la même carte, dans le même véhicule et sur
     # la même ligne, est considéré comme le MÊME voyage (-> TRIP_ALREADY_VALIDATED).
     trip_window_minutes: int = Field(default=60, ge=1)
-    # Fuseau horaire servant à déterminer la DATE (locale) du scan pour choisir le tarif applicable.
-    tariff_timezone: str = "Africa/Tunis"
+    # Fuseau horaire servant à déterminer la DATE (locale) du scan : tarif applicable et validité des abonnements.
+    business_timezone: str = "Africa/Tunis"
+
+    # --- API TEMPORAIRE de réinitialisation des données de test (à supprimer : voir le README, « Retirer l'API de réinitialisation »)
+    # false = l'endpoint n'est même pas enregistré (absent de /docs, 404).
+    test_data_reset_enabled: bool = True
+    # Si défini, l'appel doit envoyer l'en-tête `X-Reset-Token: <valeur>` (utile si le serveur est joignable depuis Internet).
+    test_data_reset_token: str | None = None
 
 
 @lru_cache

@@ -141,7 +141,7 @@ class PaymentService:
         fares: LineFareRepository,
         transactions: TransactionRepository,
         trip_window_minutes: int = 60,
-        tariff_timezone: str = "Africa/Tunis",
+        business_timezone: str = "Africa/Tunis",
     ):
         self.db = db
         self.cards = cards
@@ -150,7 +150,7 @@ class PaymentService:
         self.fares = fares
         self.transactions = transactions
         self.trip_window = timedelta(minutes=trip_window_minutes)
-        self.tariff_tz = ZoneInfo(tariff_timezone)
+        self.local_tz = ZoneInfo(business_timezone)
 
     # ------------------------------------------------------------------ API publique
 
@@ -245,7 +245,7 @@ class PaymentService:
         line = self.lines.get_active_by_number(cmd.line_number)
         if line is None:
             raise InvalidLineError()
-        occurred_local_date = occurred_at.astimezone(self.tariff_tz).date()
+        occurred_local_date = occurred_at.astimezone(self.local_tz).date()
         fare = self.fares.get_applicable(line.id, occurred_local_date)  # tarif d'UN sens, None si absent
         shown = fare if fare is not None else Decimal("0.000")  # montant « demandé » indiqué dans un refus
 
@@ -318,7 +318,7 @@ class PaymentService:
             device_id=cmd.device_id,
             vehicle_id=cmd.vehicle_id,
             line_id=line.id,
-            fare=fare,
+            fare_amount=fare,
             amount=amount,
             currency=card.currency,
             payment_method=method.value if method else None,

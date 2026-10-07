@@ -15,7 +15,7 @@ class Transaction(Base):
     L'identité d'un scan est (device_id, transaction_id, occurred_at) : la contrainte UNIQUE correspondante est la
     garantie ultime d'idempotence. Un `transaction_id` réutilisé un autre jour (compteur remis à zéro, par
     exemple) n'est donc PAS pris pour un renvoi : l'heure du badge (`occurred_at`) est différente.
-    `fare` = tarif (un sens) applicable à la date du scan, NULL si aucun tarif n'est défini ;
+    `fare_amount` = tarif (un sens) applicable à la date du scan, NULL si aucun tarif n'est défini ;
     `amount` = montant réellement débité (0 pour un abonnement).
     """
 
@@ -31,7 +31,7 @@ class Transaction(Base):
     device_id: Mapped[str] = mapped_column(String(64))
     vehicle_id: Mapped[str] = mapped_column(String(64))
     line_id: Mapped[int] = mapped_column(ForeignKey("lines.id"))
-    fare: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
+    fare_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 3), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 3))
     currency: Mapped[str] = mapped_column(String(3))
     payment_method: Mapped[str | None] = mapped_column(String(20), nullable=True)

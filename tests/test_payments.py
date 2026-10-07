@@ -31,9 +31,10 @@ def test_valid_subscription_is_approved(client):
     }
 
 
-@pytest.mark.parametrize("line", [L22A, L52A, L61])
-def test_one_subscription_covers_all_its_lines(client, line):
-    """SUB-001 = 22A + 52A + 61. 52A et 61 n'ont pas de tarif : l'abonnement n'en a pas besoin."""
+@pytest.mark.parametrize("line", [L22A, "22B", L52A, "52B", "52C", L61])
+def test_subscription_covers_every_bus_line_of_its_corridors(client, line):
+    """L'abonnement de la carte 1000000001 = liaisons Sousse-Msaken (22A, 22B), Sousse-Monastir (52A, 52B, 52C), Sousse-Jammel (61).
+    Les lignes sans tarif au trajet (22B, 52x, 61) sont couvertes quand même : l'abonnement n'en a pas besoin."""
     data = pay(client, line_number=line).json()["data"]
     assert (data["status"], data["reason_code"]) == ("APPROVED", "VALID_SUBSCRIPTION")
     assert balance_of(CARD_SUB) == Decimal("10.000")

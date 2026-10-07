@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.core.constants import EntityStatus
 from app.models.category import Category
-from app.models.subscription import Subscription, SubscriptionLine
+from app.models.corridor import Corridor, CorridorLine
+from app.models.subscription import Subscription, SubscriptionCorridor
 
 
 class SubscriptionRepository:
@@ -32,16 +33,21 @@ class SubscriptionRepository:
         return self.db.scalar(stmt) is not None
 
     def has_valid_subscription_for_line(self, card_id: int, line_id: int, on_date: date) -> bool:
-        """Vrai si la carte a un abonnement actif, valide à `on_date`, dont la liste de lignes contient `line_id`."""
+        """Vrai si la carte a un abonnement actif, valide à `on_date`, dont une liaison (corridor) est desservie par la
+        ligne `line_id` : tous les bus d'une liaison (22A, 22B...) sont couverts, et une ligne peut desservir plusieurs liaisons."""
+        active = EntityStatus.ACTIVE.value
         stmt = (
             select(Subscription.id)
-            .join(SubscriptionLine, SubscriptionLine.subscription_id == Subscription.id)
+            .join(SubscriptionCorridor, SubscriptionCorridor.subscription_id == Subscription.id)
+            .join(Corridor, Corridor.id == SubscriptionCorridor.corridor_id)
+            .join(CorridorLine, CorridorLine.corridor_id == Corridor.id)
             .where(
                 Subscription.card_id == card_id,
-                Subscription.status == EntityStatus.ACTIVE.value,
+                Subscription.status == active,
                 Subscription.valid_from <= on_date,
                 Subscription.valid_until >= on_date,
-                SubscriptionLine.line_id == line_id,
+                Corridor.status == active,
+                CorridorLine.line_id == line_id,
             )
             .limit(1)
         )

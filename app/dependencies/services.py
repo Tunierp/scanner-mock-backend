@@ -9,6 +9,7 @@ from app.repositories.line_fare_repository import LineFareRepository
 from app.repositories.line_repository import LineRepository
 from app.repositories.subscription_repository import SubscriptionRepository
 from app.repositories.transaction_repository import TransactionRepository
+from app.services.data_reset_service import DataResetService  # TEMPORAIRE
 from app.services.payment_service import PaymentService
 
 
@@ -21,5 +22,9 @@ def get_payment_service(db: Session = Depends(get_db)) -> PaymentService:
         fares=LineFareRepository(db),
         transactions=TransactionRepository(db),
         trip_window_minutes=get_settings().trip_window_minutes,
-        tariff_timezone=get_settings().tariff_timezone,
+        business_timezone=get_settings().business_timezone,
     )
+
+
+def get_data_reset_service(db: Session = Depends(get_db)) -> DataResetService:  # TEMPORAIRE
+    return DataResetService(db)

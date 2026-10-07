@@ -23,6 +23,15 @@ class CardStatus(StrEnum):
     REPLACED = "REPLACED"
 
 
+class CategoryType(StrEnum):
+    """Type d'entité qu'une catégorie classe (une seule table `categories`, colonne `type`).
+    Nouveau type = nouvelle valeur ici, aucune nouvelle table."""
+
+    SUBSCRIPTION = "SUBSCRIPTION"
+    USER = "USER"
+    BUS = "BUS"
+
+
 class EntityStatus(StrEnum):
     """Statut générique (abonnement, ligne, lien carte/abonnement)."""
 
@@ -52,7 +61,9 @@ class ReasonCode(StrEnum):
     ACTIVE_CARD_ALREADY_EXISTS = "ACTIVE_CARD_ALREADY_EXISTS"
     CATEGORY_NOT_FOUND = "CATEGORY_NOT_FOUND"
     PERIOD_NOT_FOUND = "PERIOD_NOT_FOUND"
-    SUBSCRIPTION_TARIFF_NOT_FOUND = "SUBSCRIPTION_TARIFF_NOT_FOUND"
+    CORRIDOR_NOT_FOUND = "CORRIDOR_NOT_FOUND"
+    SUBSCRIPTION_FARE_NOT_FOUND = "SUBSCRIPTION_FARE_NOT_FOUND"
+    RESET_FORBIDDEN = "RESET_FORBIDDEN"  # API temporaire de réinitialisation
     # Codes techniques (erreurs HTTP génériques)
     VALIDATION_ERROR = "VALIDATION_ERROR"
     NOT_FOUND = "NOT_FOUND"
@@ -81,7 +92,9 @@ MESSAGES: dict[ReasonCode, str] = {
     ReasonCode.ACTIVE_CARD_ALREADY_EXISTS: "Cet utilisateur possède déjà une carte active.",
     ReasonCode.CATEGORY_NOT_FOUND: "Catégorie inconnue ou inactive.",
     ReasonCode.PERIOD_NOT_FOUND: "Période d'abonnement inconnue ou inactive.",
-    ReasonCode.SUBSCRIPTION_TARIFF_NOT_FOUND: "Aucun tarif d'abonnement défini pour cette combinaison catégorie + ligne + période.",
+    ReasonCode.CORRIDOR_NOT_FOUND: "Liaison (corridor) inconnue ou inactive.",
+    ReasonCode.SUBSCRIPTION_FARE_NOT_FOUND: "Aucun tarif d'abonnement défini pour cette combinaison catégorie + liaison + période.",
+    ReasonCode.RESET_FORBIDDEN: "Jeton de réinitialisation manquant ou invalide (en-tête X-Reset-Token).",
     ReasonCode.VALIDATION_ERROR: "Requête invalide.",
     ReasonCode.NOT_FOUND: "Ressource introuvable.",
     ReasonCode.HTTP_ERROR: "Erreur HTTP.",

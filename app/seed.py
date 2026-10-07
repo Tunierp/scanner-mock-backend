@@ -1,7 +1,7 @@
 """Données de test (idempotent).
 
 Usage :
-    python -m app.seed            # crée ce qui manque (lignes, tarifs, catégories, périodes, utilisateurs, cartes, abonnements)
+    python -m app.seed            # crée ce qui manque (lignes, tarifs, catégories, périodes, liaisons, utilisateurs, cartes, abonnements)
     python -m app.seed --reset    # remet soldes/états des cartes de test à l'état initial et purge les transactions
 
 Voir app/data/sts_lines.py (lignes, tarifs au trajet) et app/data/subscription_catalog.py (catégories, périodes, tarifs d'abonnement).
@@ -15,16 +15,18 @@ from sqlalchemy.orm import Session
 
 from app.core.constants import CardStatus, EntityStatus
 from app.data.sts_lines import LINE_FARES, STS_LINES
-from app.data.subscription_catalog import CATEGORIES, PERIODS, SUBSCRIPTION_TARIFFS
+from app.data.subscription_catalog import CATEGORIES, CORRIDORS, PERIODS, SUBSCRIPTION_FARES
 from app.dependencies.database import SessionLocal
 from app.models import (
     Card,
     Category,
+    Corridor,
+    CorridorLine,
     Line,
     LineFare,
     Subscription,
+    SubscriptionFare,
     SubscriptionPeriod,
-    SubscriptionTariff,
     Transaction,
     User,
 )
@@ -42,16 +44,16 @@ USERS = {
     "handicap": ("Utilisateur", "Handicapé Test"),
 }
 
-# (card_tag, utilisateur, état, solde, [(catégorie, période, début, [numéros de lignes])])
+# (card_tag, utilisateur, état, solde, [(catégorie, période, début, [codes des liaisons])])
 # Un utilisateur peut avoir plusieurs cartes (historique) mais une seule ACTIVE.
 CARDS: list[tuple[str, str | None, CardStatus, str, list[tuple[str, str, date, list[str]]]]] = [
-    ("1000000001", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2026, ["22A", "52A", "61"])]),
+    ("1000000001", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2026, ["SOUSSE-MSAKEN", "SOUSSE-MONASTIR", "SOUSSE-JAMMEL"])]),
     ("1000000002", None, CardStatus.ACTIVE, "0.300", []),
     ("1000000003", None, CardStatus.ACTIVE, "10.000", []),
     ("1000000004", None, CardStatus.BLOCKED, "10.000", []),
-    ("1000000005", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2026, ["61"])]),
+    ("1000000005", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2026, ["SOUSSE-JAMMEL"])]),
     ("1000000006", None, CardStatus.EXPIRED, "10.000", []),
-    ("1000000007", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2025, ["22A"])]),  # périmé fin 2025
+    ("1000000007", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2025, ["SOUSSE-MSAKEN"])]),  # périmé fin 2025
     ("1000000008", "handicap", CardStatus.ACTIVE, "10.000", [("DISABLED", "ANNUAL", START_2026, [])]),
     # Historique de cartes d'une même utilisatrice : perdue, remplacée, puis la carte active
     ("1000000009", "rim", CardStatus.LOST, "10.000", []),
@@ -60,8 +62,8 @@ CARDS: list[tuple[str, str | None, CardStatus, str, list[tuple[str, str, date, l
     ("1000000012", None, CardStatus.INACTIVE, "10.000", []),
     # Exemple de l'énoncé : une carte, deux abonnements (catégories et lignes différentes)
     ("1236547895", "ahmad", CardStatus.ACTIVE, "10.000", [
-        ("UNIVERSITY", "ANNUAL", START_2026, ["13C", "16"]),
-        ("PASSENGER", "ANNUAL", START_2026, ["52A"]),
+        ("UNIVERSITY", "ANNUAL", START_2026, ["SOUSSE-SAHLOUL", "SOUSSE-AKOUDA"]),
+        ("PASSENGER", "ANNUAL", START_2026, ["SOUSSE-MONASTIR"]),
     ]),
     # Scénario « deux bus »
     ("1258465854", None, CardStatus.ACTIVE, "10.000", []),
@@ -89,14 +91,15 @@ def seed(db: Session, reset: bool = False) -> None:
             db.add(LineFare(line_id=lines[number].id, amount=Decimal(amount), valid_from=valid_from))
     db.flush()
 
-    # --- catégories, périodes, tarifs d'abonnement
+    # --- catégories (une seule table, colonne `type`), périodes, liaisons, tarifs d'abonnement
     categories: dict[str, Category] = {}
-    for code, name, free_travel in CATEGORIES:
-        category = db.scalar(select(Category).where(Category.code == code))
+    for category_type, code, name, free_travel in CATEGORIES:
+        category = db.scalar(select(Category).where(Category.type == category_type.value, Category.code == code))
         if category is None:
-            category = Category(code=code, name=name, free_travel=free_travel, status=EntityStatus.ACTIVE.value)
+            category = Category(type=category_type.value, code=code, name=name, free_travel=free_travel,
+                                status=EntityStatus.ACTIVE.value)
             db.add(category)
-        categories[code] = category
+        categories[code] = category  # catégories d'abonnement (type SUBSCRIPTION)
     periods: dict[str, SubscriptionPeriod] = {}
     for code, name, months in PERIODS:
         period = db.scalar(select(SubscriptionPeriod).where(SubscriptionPeriod.code == code))
@@ -105,19 +108,33 @@ def seed(db: Session, reset: bool = False) -> None:
             db.add(period)
         periods[code] = period
     db.flush()
-    for number, cat_code, period_code, amount, valid_from in SUBSCRIPTION_TARIFFS:
+    corridors: dict[str, Corridor] = {}
+    for code, name, departure, destination, line_numbers in CORRIDORS:
+        corridor = db.scalar(select(Corridor).where(Corridor.code == code))
+        if corridor is None:
+            corridor = Corridor(code=code, name=name, departure=departure, destination=destination,
+                                status=EntityStatus.ACTIVE.value)
+            db.add(corridor)
+            db.flush()
+        for number in line_numbers:
+            if db.scalar(select(CorridorLine.corridor_id).where(CorridorLine.corridor_id == corridor.id,
+                                                                CorridorLine.line_id == lines[number].id)) is None:
+                db.add(CorridorLine(corridor_id=corridor.id, line_id=lines[number].id))
+        corridors[code] = corridor
+    db.flush()
+    for corridor_code, cat_code, period_code, amount, valid_from in SUBSCRIPTION_FARES:
         exists = db.scalar(
-            select(SubscriptionTariff.id).where(
-                SubscriptionTariff.category_id == categories[cat_code].id,
-                SubscriptionTariff.line_id == lines[number].id,
-                SubscriptionTariff.period_id == periods[period_code].id,
-                SubscriptionTariff.valid_from == valid_from,
+            select(SubscriptionFare.id).where(
+                SubscriptionFare.category_id == categories[cat_code].id,
+                SubscriptionFare.corridor_id == corridors[corridor_code].id,
+                SubscriptionFare.period_id == periods[period_code].id,
+                SubscriptionFare.valid_from == valid_from,
             )
         )
         if exists is None:
-            db.add(SubscriptionTariff(
-                category_id=categories[cat_code].id, line_id=lines[number].id, period_id=periods[period_code].id,
-                amount=Decimal(amount), valid_from=valid_from,
+            db.add(SubscriptionFare(
+                category_id=categories[cat_code].id, corridor_id=corridors[corridor_code].id,
+                period_id=periods[period_code].id, amount=Decimal(amount), valid_from=valid_from,
             ))
     db.flush()
 
@@ -138,7 +155,7 @@ def seed(db: Session, reset: bool = False) -> None:
             card.status = status.value
             card.balance = Decimal(balance)
             db.flush()
-        for cat_code, period_code, start, line_numbers in subscriptions:
+        for cat_code, period_code, start, corridor_codes in subscriptions:
             exists = db.scalar(
                 select(Subscription.id).where(
                     Subscription.card_id == card.id,
@@ -148,7 +165,7 @@ def seed(db: Session, reset: bool = False) -> None:
                 )
             )
             if exists is None:
-                subscription_service.create_subscription(card, cat_code, period_code, line_numbers, start)
+                subscription_service.create_subscription(card, cat_code, period_code, corridor_codes, start)
     db.commit()
 
 

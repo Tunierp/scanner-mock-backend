@@ -64,9 +64,19 @@ class PeriodNotFoundError(AppError):
     code = ReasonCode.PERIOD_NOT_FOUND
 
 
-class SubscriptionTariffNotFoundError(AppError):
+class CorridorNotFoundError(AppError):
     http_status = 404
-    code = ReasonCode.SUBSCRIPTION_TARIFF_NOT_FOUND
+    code = ReasonCode.CORRIDOR_NOT_FOUND
+
+
+class SubscriptionFareNotFoundError(AppError):
+    http_status = 404
+    code = ReasonCode.SUBSCRIPTION_FARE_NOT_FOUND
+
+
+class ResetForbiddenError(AppError):  # API temporaire de réinitialisation
+    http_status = 403
+    code = ReasonCode.RESET_FORBIDDEN
 
 
 class InternalError(AppError):
