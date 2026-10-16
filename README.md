@@ -16,13 +16,13 @@ Ou dans Swagger (`/docs`) : section **« ⚠ Données de test (API TEMPORAIRE) �
 
 Ce que ça fait (équivalent de `python -m app.seed --reset`) :
 - **supprime toutes les transactions** (les `transaction_id` redeviennent utilisables) ;
-- remet les **cartes de test** (`1000000001`…`1000000012`, `1236547895`, `1258465854`, `1258465855`) à leur solde et à leur état initiaux ;
+- remet les **cartes de test** (`4BEACF06`…`1000000012`, `DA06FA05`, `1258465854`, `1258465855`) à leur solde et à leur état initiaux ;
 - recrée ce qui manque des données de test. Les données ajoutées en dehors du seed (lignes, tarifs…) sont **conservées**.
 
 Réponse :
 ```json
 {"success": true, "data": {"message": "Données de test réinitialisées.", "deleted_transactions": 12,
-  "cards": [{"card_tag": "1000000001", "status": "ACTIVE", "balance": 10.0}, "…"]}}
+  "cards": [{"card_tag": "4BEACF06", "status": "ACTIVE", "balance": 10.0}, "…"]}}
 ```
 `cards` donne l'état des cartes de test après l'opération (c'est aussi le seul moyen de lire un solde par l'API).
 
@@ -154,7 +154,7 @@ from app.services.card_service import CardService
 from app.services.subscription_service import SubscriptionService
 
 user = UserService.from_session(db).create_user("Ahmad", "Ben Ali", email="a@b.tn", national_id="01234567")
-card = CardService.from_session(db).issue_card(user, "1236547895")          # refuse une 2e carte active
+card = CardService.from_session(db).issue_card(user, "DA06FA05")          # refuse une 2e carte active
 subs = SubscriptionService.from_session(db)
 quote = subs.quote("UNIVERSITY", "ANNUAL", ["SOUSSE-SAHLOUL", "SOUSSE-AKOUDA"], date(2026, 1, 1))  # prix sans rien créer
 sub = subs.create_subscription(card, "UNIVERSITY", "ANNUAL", ["SOUSSE-SAHLOUL", "SOUSSE-AKOUDA"], date(2026, 1, 1))
@@ -208,17 +208,17 @@ Nouveaux codes : `FREE_TRAVEL_CATEGORY`, `CARD_NOT_ACTIVE`, `CARD_LOST`, `CARD_R
 
 | `card_tag` | Utilisateur / état | Solde | Abonnement(s) | Résultat |
 |---|---|---|---|---|
-| `1000000001` | ACTIVE | 10.000 | Passager annuel : liaisons Msaken, Monastir, Jammel (86.000) | lignes 22A, **22B**, 52A/B/C, 61 : gratuit · ligne 28 : `FARE_NOT_FOUND` |
-| `1000000002` | ACTIVE | 0.300 | – | 22A : `INSUFFICIENT_BALANCE` |
-| `1000000003` | ACTIVE | 10.000 | – | 22A : `BALANCE_DEBITED` (→ 8.800) |
-| `1000000004` | BLOCKED | 10.000 | – | `CARD_BLOCKED` |
+| `4BEACF06` | ACTIVE | 10.000 | Passager annuel : liaisons Msaken, Monastir, Jammel (86.000) | lignes 22A, **22B**, 52A/B/C, 61 : gratuit · ligne 28 : `FARE_NOT_FOUND` |
+| `ACAECE06` | ACTIVE | 0.300 | – | 22A : `INSUFFICIENT_BALANCE` |
+| `4578D006` | ACTIVE | 10.000 | – | 22A : `BALANCE_DEBITED` (→ 8.800) |
+| `540CCE06` | BLOCKED | 10.000 | – | `CARD_BLOCKED` |
 | `1000000005` | ACTIVE | 10.000 | Passager annuel : liaison Jammel (ligne 61) | 61 : gratuit · 22A : `BALANCE_DEBITED` |
 | `1000000006` | EXPIRED | 10.000 | – | `CARD_EXPIRED` |
-| `1000000007` | ACTIVE | 10.000 | Passager annuel 2025 (périmé) : liaison Msaken | 22A : `BALANCE_DEBITED` |
-| `1000000008` | ACTIVE | 10.000 | **Handicapé** annuel (aucune ligne) | **toutes les lignes : `FREE_TRAVEL_CATEGORY`** |
+| `DEBACF06` | ACTIVE | 10.000 | Passager annuel 2025 (périmé) : liaison Msaken | 22A : `BALANCE_DEBITED` |
+| `6173FA17` | ACTIVE | 10.000 | **Handicapé** annuel (aucune ligne) | **toutes les lignes : `FREE_TRAVEL_CATEGORY`** |
 | `1000000009` / `1000000010` / `1000000011` | LOST / REPLACED / ACTIVE (même utilisatrice, Rim) | 10.000 | – | `CARD_LOST` / `CARD_REPLACED` / `BALANCE_DEBITED` |
 | `1000000012` | INACTIVE | 10.000 | – | `CARD_NOT_ACTIVE` |
-| `1236547895` | Ahmad, ACTIVE | 10.000 | ① Universitaire annuel : Sousse-Sahloul + Sousse-Akouda (42.000) ② Passager annuel : Sousse-Monastir (30.000) | 13C, 16, 52A… : gratuit · 22A : `BALANCE_DEBITED` |
+| `DA06FA05` | Ahmad, ACTIVE | 10.000 | ① Universitaire annuel : Sousse-Sahloul + Sousse-Akouda (42.000) ② Passager annuel : Sousse-Monastir (30.000) | 13C, 16, 52A… : gratuit · 22A : `BALANCE_DEBITED` |
 | `1258465854`, `1258465855` | ACTIVE | 10.000 | – | 22A : `BALANCE_DEBITED` (scénario « deux bus ») |
 
 ## Identité d'un scan et voyage déjà validé

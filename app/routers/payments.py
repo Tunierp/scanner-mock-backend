@@ -16,57 +16,57 @@ _BASE = {
 
 REQUEST_EXAMPLES = {
     "abonnement_valide": {
-        "summary": "Carte 1000000001 / ligne 22A → APPROVED (VALID_SUBSCRIPTION)",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0001", "card_tag": "1000000001"},
+        "summary": "Carte 4BEACF06 / ligne 22A → APPROVED (VALID_SUBSCRIPTION)",
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0001", "card_tag": "4BEACF06"},
     },
     "abonnement_ligne_sans_tarif": {
-        "summary": "Carte 1000000001 / ligne 52A (sans tarif) → APPROVED : l'abonnement n'a pas besoin de tarif",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0002", "card_tag": "1000000001", "line_number": "52A"},
+        "summary": "Carte 4BEACF06 / ligne 52A (sans tarif) → APPROVED : l'abonnement n'a pas besoin de tarif",
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0002", "card_tag": "4BEACF06", "line_number": "52A"},
     },
     "debit_solde": {
-        "summary": "Carte 1000000003 / ligne 22A → APPROVED (BALANCE_DEBITED, tarif 1.200)",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0003", "card_tag": "1000000003"},
+        "summary": "Carte 4578D006 / ligne 22A → APPROVED (BALANCE_DEBITED, tarif 1.200)",
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0003", "card_tag": "4578D006"},
     },
     "double_scan": {
         "summary": "Même carte, même bus, même ligne, NOUVEAU transaction_id → DECLINED (TRIP_ALREADY_VALIDATED)",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0004", "card_tag": "1000000003"},
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0004", "card_tag": "4578D006"},
     },
     "solde_insuffisant": {
-        "summary": "Carte 1000000002 → DECLINED (INSUFFICIENT_BALANCE)",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0005", "card_tag": "1000000002"},
+        "summary": "Carte ACAECE06 → DECLINED (INSUFFICIENT_BALANCE)",
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0005", "card_tag": "ACAECE06"},
     },
     "carte_bloquee": {
-        "summary": "Carte 1000000004 → DECLINED (CARD_BLOCKED)",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0006", "card_tag": "1000000004"},
+        "summary": "Carte 540CCE06 → DECLINED (CARD_BLOCKED)",
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0006", "card_tag": "540CCE06"},
     },
     "gratuite_handicape": {
-        "summary": "Carte 1000000008 (catégorie Handicapé) / ligne 28 → APPROVED (FREE_TRAVEL_CATEGORY) : gratuit sur toutes les lignes",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0012", "card_tag": "1000000008", "line_number": "28"},
+        "summary": "Carte 6173FA17 (catégorie Handicapé) / ligne 28 → APPROVED (FREE_TRAVEL_CATEGORY) : gratuit sur toutes les lignes",
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0012", "card_tag": "6173FA17", "line_number": "28"},
     },
     "carte_perdue": {
         "summary": "Carte 1000000009 (perdue) → DECLINED (CARD_LOST)",
         "value": {**_BASE, "transaction_id": "SCANNER-001-0013", "card_tag": "1000000009"},
     },
     "deux_abonnements": {
-        "summary": "Carte 1236547895 (2 abonnements : Universitaire 13C+16, Passager 52A) / ligne 13C → APPROVED",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0014", "card_tag": "1236547895", "line_number": "13C"},
+        "summary": "Carte DA06FA05 (2 abonnements : Universitaire 13C+16, Passager 52A) / ligne 13C → APPROVED",
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0014", "card_tag": "DA06FA05", "line_number": "13C"},
     },
     "abonnement_autre_ligne": {
         "summary": "Carte 1000000005 / ligne 22A → débit du solde (son abonnement couvre la ligne 61)",
         "value": {**_BASE, "transaction_id": "SCANNER-001-0007", "card_tag": "1000000005"},
     },
     "ligne_sans_tarif": {
-        "summary": "Carte 1000000003 / ligne 28 (aucun tarif défini) → 404 FARE_NOT_FOUND",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0008", "card_tag": "1000000003", "line_number": "28"},
+        "summary": "Carte 4578D006 / ligne 28 (aucun tarif défini) → 404 FARE_NOT_FOUND",
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0008", "card_tag": "4578D006", "line_number": "28"},
     },
     "tarif_historique": {
-        "summary": "Carte 1000000003 / ligne 22A le 2024-06-01 → tarif de l'époque (1.100)",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0009", "card_tag": "1000000003",
+        "summary": "Carte 4578D006 / ligne 22A le 2024-06-01 → tarif de l'époque (1.100)",
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0009", "card_tag": "4578D006",
                   "occurred_at": "2024-06-01T10:00:00Z"},
     },
     "ligne_inconnue": {
         "summary": "Ligne inexistante → 400 INVALID_LINE",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0010", "card_tag": "1000000003", "line_number": "999X"},
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0010", "card_tag": "4578D006", "line_number": "999X"},
     },
     "carte_inconnue": {
         "summary": "Carte inexistante → 404 CARD_NOT_FOUND",

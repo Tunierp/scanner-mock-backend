@@ -20,7 +20,7 @@ class ResetResponse(BaseModel):
     model_config = ConfigDict(json_schema_extra={"examples": [{
         "success": True,
         "data": {"message": "Données de test réinitialisées.", "deleted_transactions": 12,
-                 "cards": [{"card_tag": "1000000001", "status": "ACTIVE", "balance": 10.0}]},
+                 "cards": [{"card_tag": "4BEACF06", "status": "ACTIVE", "balance": 10.0}]},
     }]})
     success: bool = True
     data: ResetData

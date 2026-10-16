@@ -33,7 +33,7 @@ def test_valid_subscription_is_approved(client):
 
 @pytest.mark.parametrize("line", [L22A, "22B", L52A, "52B", "52C", L61])
 def test_subscription_covers_every_bus_line_of_its_corridors(client, line):
-    """L'abonnement de la carte 1000000001 = liaisons Sousse-Msaken (22A, 22B), Sousse-Monastir (52A, 52B, 52C), Sousse-Jammel (61).
+    """L'abonnement de la carte 4BEACF06 = liaisons Sousse-Msaken (22A, 22B), Sousse-Monastir (52A, 52B, 52C), Sousse-Jammel (61).
     Les lignes sans tarif au trajet (22B, 52x, 61) sont couvertes quand même : l'abonnement n'en a pas besoin."""
     data = pay(client, line_number=line).json()["data"]
     assert (data["status"], data["reason_code"]) == ("APPROVED", "VALID_SUBSCRIPTION")
@@ -41,7 +41,7 @@ def test_subscription_covers_every_bus_line_of_its_corridors(client, line):
 
 
 def test_a_line_can_belong_to_several_subscriptions(client):
-    """La ligne 61 est dans l'abonnement de la carte 1000000001 ET dans celui de la carte 1000000005."""
+    """La ligne 61 est dans l'abonnement de la carte 4BEACF06 ET dans celui de la carte 1000000005."""
     assert pay(client, transaction_id="A", card_tag=CARD_SUB, line_number=L61).json()["data"]["reason_code"] == "VALID_SUBSCRIPTION"
     assert pay(client, transaction_id="B", card_tag=CARD_SUB_L, line_number=L61).json()["data"]["reason_code"] == "VALID_SUBSCRIPTION"
 

@@ -40,7 +40,7 @@ def reset_test_data(
     """⚠ **API temporaire, destructive, qui sera supprimée.** Équivaut à `python -m app.seed --reset` :
 
     * **supprime toutes les transactions** (les `transaction_id` peuvent être réutilisés ensuite) ;
-    * remet les **cartes de test** à leur solde et à leur état initiaux (`1000000001`…, `1236547895`, `1258465854`/`5`) ;
+    * remet les **cartes de test** à leur solde et à leur état initiaux (`4BEACF06`…, `DA06FA05`, `1258465854`/`5`) ;
     * recrée ce qui manque des données de test (lignes, liaisons, catégories, abonnements…).
 
     Les données ajoutées en dehors du seed sont conservées. Aucun corps de requête n'est nécessaire.

@@ -13,13 +13,13 @@ depends_on = None
 
 # Anciennes cartes de test -> nouveaux numéros à 10 chiffres
 OLD_TO_NEW = {
-    "CARD-TEST-001": "1000000001",
-    "CARD-TEST-002": "1000000002",
-    "CARD-TEST-003": "1000000003",
-    "CARD-TEST-004": "1000000004",
+    "CARD-TEST-001": "4BEACF06",
+    "CARD-TEST-002": "ACAECE06",
+    "CARD-TEST-003": "4578D006",
+    "CARD-TEST-004": "540CCE06",
     "CARD-TEST-005": "1000000005",
     "CARD-TEST-006": "1000000006",
-    "CARD-TEST-007": "1000000007",
+    "CARD-TEST-007": "DEBACF06",
 }
 
 

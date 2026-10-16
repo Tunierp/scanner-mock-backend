@@ -47,21 +47,21 @@ USERS = {
 # (card_tag, utilisateur, état, solde, [(catégorie, période, début, [codes des liaisons])])
 # Un utilisateur peut avoir plusieurs cartes (historique) mais une seule ACTIVE.
 CARDS: list[tuple[str, str | None, CardStatus, str, list[tuple[str, str, date, list[str]]]]] = [
-    ("1000000001", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2026, ["SOUSSE-MSAKEN", "SOUSSE-MONASTIR", "SOUSSE-JAMMEL"])]),
-    ("1000000002", None, CardStatus.ACTIVE, "0.300", []),
-    ("1000000003", None, CardStatus.ACTIVE, "10.000", []),
-    ("1000000004", None, CardStatus.BLOCKED, "10.000", []),
+    ("4BEACF06", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2026, ["SOUSSE-MSAKEN", "SOUSSE-MONASTIR", "SOUSSE-JAMMEL"])]),
+    ("ACAECE06", None, CardStatus.ACTIVE, "0.300", []),
+    ("4578D006", None, CardStatus.ACTIVE, "10.000", []),
+    ("540CCE06", None, CardStatus.BLOCKED, "10.000", []),
     ("1000000005", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2026, ["SOUSSE-JAMMEL"])]),
     ("1000000006", None, CardStatus.EXPIRED, "10.000", []),
-    ("1000000007", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2025, ["SOUSSE-MSAKEN"])]),  # périmé fin 2025
-    ("1000000008", "handicap", CardStatus.ACTIVE, "10.000", [("DISABLED", "ANNUAL", START_2026, [])]),
+    ("DEBACF06", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2025, ["SOUSSE-MSAKEN"])]),  # périmé fin 2025
+    ("6173FA17", "handicap", CardStatus.ACTIVE, "10.000", [("DISABLED", "ANNUAL", START_2026, [])]),
     # Historique de cartes d'une même utilisatrice : perdue, remplacée, puis la carte active
     ("1000000009", "rim", CardStatus.LOST, "10.000", []),
     ("1000000010", "rim", CardStatus.REPLACED, "10.000", []),
     ("1000000011", "rim", CardStatus.ACTIVE, "10.000", []),
     ("1000000012", None, CardStatus.INACTIVE, "10.000", []),
     # Exemple de l'énoncé : une carte, deux abonnements (catégories et lignes différentes)
-    ("1236547895", "ahmad", CardStatus.ACTIVE, "10.000", [
+    ("DA06FA05", "ahmad", CardStatus.ACTIVE, "10.000", [
         ("UNIVERSITY", "ANNUAL", START_2026, ["SOUSSE-SAHLOUL", "SOUSSE-AKOUDA"]),
         ("PASSENGER", "ANNUAL", START_2026, ["SOUSSE-MONASTIR"]),
     ]),

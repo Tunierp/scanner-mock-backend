@@ -93,4 +93,4 @@ def test_card_tag_must_be_10_digits(db, tag):
 def test_card_tag_must_be_unique(db):
     user = UserService.from_session(db).create_user("Sana", "Ben Ali")
     with pytest.raises(ValueError):
-        CardService.from_session(db).issue_card(user, "1000000001")  # existe déjà dans les données de test
+        CardService.from_session(db).issue_card(user, "4BEACF06")  # existe déjà dans les données de test
