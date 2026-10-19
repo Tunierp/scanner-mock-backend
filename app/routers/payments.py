@@ -44,16 +44,16 @@ REQUEST_EXAMPLES = {
         "value": {**_BASE, "transaction_id": "SCANNER-001-0012", "card_tag": "6173FA17", "line_number": "28"},
     },
     "carte_perdue": {
-        "summary": "Carte 1000000009 (perdue) → DECLINED (CARD_LOST)",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0013", "card_tag": "1000000009"},
+        "summary": "Carte 3B9ACA09 (perdue) → DECLINED (CARD_LOST)",
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0013", "card_tag": "3B9ACA09"},
     },
     "deux_abonnements": {
         "summary": "Carte DA06FA05 (2 abonnements : Universitaire 13C+16, Passager 52A) / ligne 13C → APPROVED",
         "value": {**_BASE, "transaction_id": "SCANNER-001-0014", "card_tag": "DA06FA05", "line_number": "13C"},
     },
     "abonnement_autre_ligne": {
-        "summary": "Carte 1000000005 / ligne 22A → débit du solde (son abonnement couvre la ligne 61)",
-        "value": {**_BASE, "transaction_id": "SCANNER-001-0007", "card_tag": "1000000005"},
+        "summary": "Carte 3B9ACA05 / ligne 22A → débit du solde (son abonnement couvre la ligne 61)",
+        "value": {**_BASE, "transaction_id": "SCANNER-001-0007", "card_tag": "3B9ACA05"},
     },
     "ligne_sans_tarif": {
         "summary": "Carte 4578D006 / ligne 28 (aucun tarif défini) → 404 FARE_NOT_FOUND",
@@ -74,11 +74,11 @@ REQUEST_EXAMPLES = {
     },
     "bus_1": {
         "summary": "Deux bus, même transaction_id « T01 » (1/2) : scanner 001 / BUS-001",
-        "value": {**_BASE, "transaction_id": "T01", "card_tag": "1258465854"},
+        "value": {**_BASE, "transaction_id": "T01", "card_tag": "4B02AA3E"},
     },
     "bus_2": {
         "summary": "Deux bus, même transaction_id « T01 » (2/2) : scanner 002 / BUS-002 → accepté aussi",
-        "value": {**_BASE, "transaction_id": "T01", "card_tag": "1258465855", "device_id": "SCANNER-002",
+        "value": {**_BASE, "transaction_id": "T01", "card_tag": "4B02AA3F", "device_id": "SCANNER-002",
                   "vehicle_id": "BUS-002"},
     },
 }

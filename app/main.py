@@ -11,7 +11,7 @@ DESCRIPTION = """
 **Backend de TEST (MOCK)** pour le développeur IoT : aucun vrai paiement, aucun vrai lecteur RFID/NFC.
 
 Logique : abonnement valide pour la ligne → voyage gratuit ; sinon débit du solde ; sinon refus.
-Cartes de test : `4BEACF06` à `1000000012`, `DA06FA05`, `1258465854`, `1258465855` (voir le README).
+Cartes de test : `4BEACF06` à `3B9ACA0C`, `DA06FA05`, `4B02AA3E`, `4B02AA3F` (voir le README).
 
 ⚠ `POST /api/v1/test-data/reset` (API **temporaire**) remet les données de test à zéro.
 """

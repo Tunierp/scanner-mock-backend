@@ -10,7 +10,7 @@ class PaymentRequest(BaseModel):
             "examples": [
                 {
                     "transaction_id": "SCANNER-001-1788719400-0001",
-                    "card_tag": "1258465854",
+                    "card_tag": "4B02AA3E",
                     "device_id": "SCANNER-001",
                     "vehicle_id": "BUS-001",
                     "line_number": "22A",

@@ -16,7 +16,7 @@ Ou dans Swagger (`/docs`) : section **« ⚠ Données de test (API TEMPORAIRE) �
 
 Ce que ça fait (équivalent de `python -m app.seed --reset`) :
 - **supprime toutes les transactions** (les `transaction_id` redeviennent utilisables) ;
-- remet les **cartes de test** (`4BEACF06`…`1000000012`, `DA06FA05`, `1258465854`, `1258465855`) à leur solde et à leur état initiaux ;
+- remet les **cartes de test** (`4BEACF06`…`3B9ACA0C`, `DA06FA05`, `4B02AA3E`, `4B02AA3F`) à leur solde et à leur état initiaux ;
 - recrée ce qui manque des données de test. Les données ajoutées en dehors du seed (lignes, tarifs…) sont **conservées**.
 
 Réponse :
@@ -184,7 +184,7 @@ viennent de l'énoncé : les autres tarifs d'abonnement du seed sont des **valeu
 
 `POST /api/v1/scanner/payments` et `POST /api/v1/scanner/sync/transactions` (inchangés dans leur format) :
 ```json
-{ "transaction_id": "SCANNER-001-1788719400-0001", "card_tag": "1258465854", "device_id": "SCANNER-001",
+{ "transaction_id": "SCANNER-001-1788719400-0001", "card_tag": "4B02AA3E", "device_id": "SCANNER-001",
   "vehicle_id": "BUS-001", "line_number": "22A", "occurred_at": "2026-09-30T18:30:00Z" }
 ```
 Le scanner n'envoie ni tarif ni devise. `card_tag` : 10 chiffres en texte. Un scan = `device_id` + `transaction_id` + `occurred_at` (renvoi = mêmes valeurs).
@@ -212,14 +212,14 @@ Nouveaux codes : `FREE_TRAVEL_CATEGORY`, `CARD_NOT_ACTIVE`, `CARD_LOST`, `CARD_R
 | `ACAECE06` | ACTIVE | 0.300 | – | 22A : `INSUFFICIENT_BALANCE` |
 | `4578D006` | ACTIVE | 10.000 | – | 22A : `BALANCE_DEBITED` (→ 8.800) |
 | `540CCE06` | BLOCKED | 10.000 | – | `CARD_BLOCKED` |
-| `1000000005` | ACTIVE | 10.000 | Passager annuel : liaison Jammel (ligne 61) | 61 : gratuit · 22A : `BALANCE_DEBITED` |
-| `1000000006` | EXPIRED | 10.000 | – | `CARD_EXPIRED` |
+| `3B9ACA05` | ACTIVE | 10.000 | Passager annuel : liaison Jammel (ligne 61) | 61 : gratuit · 22A : `BALANCE_DEBITED` |
+| `3B9ACA06` | EXPIRED | 10.000 | – | `CARD_EXPIRED` |
 | `DEBACF06` | ACTIVE | 10.000 | Passager annuel 2025 (périmé) : liaison Msaken | 22A : `BALANCE_DEBITED` |
 | `6173FA17` | ACTIVE | 10.000 | **Handicapé** annuel (aucune ligne) | **toutes les lignes : `FREE_TRAVEL_CATEGORY`** |
-| `1000000009` / `1000000010` / `1000000011` | LOST / REPLACED / ACTIVE (même utilisatrice, Rim) | 10.000 | – | `CARD_LOST` / `CARD_REPLACED` / `BALANCE_DEBITED` |
-| `1000000012` | INACTIVE | 10.000 | – | `CARD_NOT_ACTIVE` |
+| `3B9ACA09` / `3B9ACA0A` / `3B9ACA0B` | LOST / REPLACED / ACTIVE (même utilisatrice, Rim) | 10.000 | – | `CARD_LOST` / `CARD_REPLACED` / `BALANCE_DEBITED` |
+| `3B9ACA0C` | INACTIVE | 10.000 | – | `CARD_NOT_ACTIVE` |
 | `DA06FA05` | Ahmad, ACTIVE | 10.000 | ① Universitaire annuel : Sousse-Sahloul + Sousse-Akouda (42.000) ② Passager annuel : Sousse-Monastir (30.000) | 13C, 16, 52A… : gratuit · 22A : `BALANCE_DEBITED` |
-| `1258465854`, `1258465855` | ACTIVE | 10.000 | – | 22A : `BALANCE_DEBITED` (scénario « deux bus ») |
+| `4B02AA3E`, `4B02AA3F` | ACTIVE | 10.000 | – | 22A : `BALANCE_DEBITED` (scénario « deux bus ») |
 
 ## Identité d'un scan et voyage déjà validé
 

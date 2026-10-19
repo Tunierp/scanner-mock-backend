@@ -34,8 +34,8 @@ class CardService:
         balance: Decimal = Decimal("0.000"),
     ) -> Card:
         """Associe une nouvelle carte à l'utilisateur (flush, sans commit)."""
-        if not re.fullmatch(r"[0-9]{10}", card_tag):
-            raise ValueError("card_tag : exactement 10 chiffres")
+        if not re.fullmatch(r"[0-9A-Fa-f]{8}", card_tag):
+            raise ValueError("card_tag : exactement 8 caractères hexadécimaux (0-9, A-F)")
         if self.cards.get_by_tag(card_tag) is not None:
             raise ValueError(f"La carte {card_tag} existe déjà")
         if status == CardStatus.ACTIVE:

@@ -41,7 +41,7 @@ def test_subscription_covers_every_bus_line_of_its_corridors(client, line):
 
 
 def test_a_line_can_belong_to_several_subscriptions(client):
-    """La ligne 61 est dans l'abonnement de la carte 4BEACF06 ET dans celui de la carte 1000000005."""
+    """La ligne 61 est dans l'abonnement de la carte 4BEACF06 ET dans celui de la carte 3B9ACA05."""
     assert pay(client, transaction_id="A", card_tag=CARD_SUB, line_number=L61).json()["data"]["reason_code"] == "VALID_SUBSCRIPTION"
     assert pay(client, transaction_id="B", card_tag=CARD_SUB_L, line_number=L61).json()["data"]["reason_code"] == "VALID_SUBSCRIPTION"
 
@@ -312,7 +312,7 @@ def test_old_field_route_id_is_no_longer_accepted(client):
 
 
 @pytest.mark.parametrize(
-    "tag", ["12345", "12345678901", "12345abcde", "1258 46585", "", 1258465854, "١٢٣٤٥٦٧٨٩٠"]
+    "tag", ["12345", "12345678901", "12345abcde", "1258 46585", "", 4B02AA3E, "١٢٣٤٥٦٧٨٩٠"]
 )
 def test_card_tag_must_be_exactly_10_digits_as_text(client, tag):
     response = pay(client, card_tag=tag)

@@ -51,23 +51,23 @@ CARDS: list[tuple[str, str | None, CardStatus, str, list[tuple[str, str, date, l
     ("ACAECE06", None, CardStatus.ACTIVE, "0.300", []),
     ("4578D006", None, CardStatus.ACTIVE, "10.000", []),
     ("540CCE06", None, CardStatus.BLOCKED, "10.000", []),
-    ("1000000005", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2026, ["SOUSSE-JAMMEL"])]),
-    ("1000000006", None, CardStatus.EXPIRED, "10.000", []),
+    ("3B9ACA05", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2026, ["SOUSSE-JAMMEL"])]),
+    ("3B9ACA06", None, CardStatus.EXPIRED, "10.000", []),
     ("DEBACF06", None, CardStatus.ACTIVE, "10.000", [("PASSENGER", "ANNUAL", START_2025, ["SOUSSE-MSAKEN"])]),  # périmé fin 2025
     ("6173FA17", "handicap", CardStatus.ACTIVE, "10.000", [("DISABLED", "ANNUAL", START_2026, [])]),
     # Historique de cartes d'une même utilisatrice : perdue, remplacée, puis la carte active
-    ("1000000009", "rim", CardStatus.LOST, "10.000", []),
-    ("1000000010", "rim", CardStatus.REPLACED, "10.000", []),
-    ("1000000011", "rim", CardStatus.ACTIVE, "10.000", []),
-    ("1000000012", None, CardStatus.INACTIVE, "10.000", []),
+    ("3B9ACA09", "rim", CardStatus.LOST, "10.000", []),
+    ("3B9ACA0A", "rim", CardStatus.REPLACED, "10.000", []),
+    ("3B9ACA0B", "rim", CardStatus.ACTIVE, "10.000", []),
+    ("3B9ACA0C", None, CardStatus.INACTIVE, "10.000", []),
     # Exemple de l'énoncé : une carte, deux abonnements (catégories et lignes différentes)
     ("DA06FA05", "ahmad", CardStatus.ACTIVE, "10.000", [
         ("UNIVERSITY", "ANNUAL", START_2026, ["SOUSSE-SAHLOUL", "SOUSSE-AKOUDA"]),
         ("PASSENGER", "ANNUAL", START_2026, ["SOUSSE-MONASTIR"]),
     ]),
     # Scénario « deux bus »
-    ("1258465854", None, CardStatus.ACTIVE, "10.000", []),
-    ("1258465855", None, CardStatus.ACTIVE, "10.000", []),
+    ("4B02AA3E", None, CardStatus.ACTIVE, "10.000", []),
+    ("4B02AA3F", None, CardStatus.ACTIVE, "10.000", []),
 ]
 
 

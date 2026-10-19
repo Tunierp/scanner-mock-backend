@@ -38,8 +38,8 @@ def test_reset_needs_no_body_and_returns_the_state_of_the_test_cards(client):
     cards = {c["card_tag"]: c for c in client.post(RESET_URL).json()["data"]["cards"]}
     assert len(cards) == 15
     assert cards["ACAECE06"] == {"card_tag": "ACAECE06", "status": "ACTIVE", "balance": 0.3}
-    assert cards["540CCE06"]["status"] == "BLOCKED" and cards["1000000006"]["status"] == "EXPIRED"
-    assert cards["1000000009"]["status"] == "LOST" and cards["DA06FA05"]["balance"] == 10.0
+    assert cards["540CCE06"]["status"] == "BLOCKED" and cards["3B9ACA06"]["status"] == "EXPIRED"
+    assert cards["3B9ACA09"]["status"] == "LOST" and cards["DA06FA05"]["balance"] == 10.0
 
 
 def test_transaction_ids_can_be_reused_after_a_reset(client):

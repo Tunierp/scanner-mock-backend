@@ -77,7 +77,7 @@ def test_a_corridor_is_present_in_several_subscriptions():
         jammel = db.scalar(select(Corridor).where(Corridor.code == "SOUSSE-JAMMEL"))
         count = db.scalar(select(func.count()).select_from(SubscriptionCorridor).where(
             SubscriptionCorridor.corridor_id == jammel.id))
-        assert count == 2  # cartes 4BEACF06 et 1000000005
+        assert count == 2  # cartes 4BEACF06 et 3B9ACA05
 
 
 def test_a_user_can_have_several_cards_in_history_but_one_active():
