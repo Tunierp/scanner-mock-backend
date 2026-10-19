@@ -30,8 +30,8 @@ class PaymentRequest(BaseModel):
         ),
     )
     card_tag: str = Field(
-        pattern=r"^[0-9]{10}$",
-        description="Numéro de la carte : exactement 10 chiffres, envoyé comme TEXTE entre guillemets (ex. \"1258465854\").",
+        pattern=r"^[0-9A-Fa-f]{8}$",
+        description="Numéro de la carte : exactement 8 caractères hexadécimaux (chiffres 0-9 et lettres A-F), envoyé comme texte entre guillemets (ex. \"6173FA17\").",
     )
     device_id: str = Field(min_length=1, max_length=64, description="Identifiant unique du scanner.")
     vehicle_id: str = Field(min_length=1, max_length=64, description="Identifiant du véhicule (bus, train...).")
